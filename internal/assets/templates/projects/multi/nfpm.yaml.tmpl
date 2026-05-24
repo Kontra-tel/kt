@@ -33,14 +33,14 @@ contents:
   # - src: resources
   #   dst: /opt/${APP}/resources
 
-  # Backend launch script — edit deploy/bin/${APP}-backend to set the command.
-  - src: deploy/bin/${APP}-backend
+  # Backend launch script — edit deploy/bin/{{.App}}-backend to set the command.
+  - src: deploy/bin/{{.App}}-backend
     dst: /usr/bin/${APP}-backend
     file_info:
       mode: 0755
 
-  # Frontend launch script — edit deploy/bin/${APP}-frontend to set the command.
-  - src: deploy/bin/${APP}-frontend
+  # Frontend launch script — edit deploy/bin/{{.App}}-frontend to set the command.
+  - src: deploy/bin/{{.App}}-frontend
     dst: /usr/bin/${APP}-frontend
     file_info:
       mode: 0755
@@ -51,15 +51,12 @@ contents:
     type: config|noreplace
 
   # systemd service units
-  - src: deploy/systemd/${APP}-backend.service
+  - src: deploy/systemd/{{.App}}-backend.service
     dst: /etc/systemd/system/${APP}-backend.service
-  - src: deploy/systemd/${APP}-frontend.service
+  - src: deploy/systemd/{{.App}}-frontend.service
     dst: /etc/systemd/system/${APP}-frontend.service
 
 scripts:
   postinstall: deploy/scripts/postinstall.sh
   preremove: deploy/scripts/preremove.sh
 
-overrides:
-  rpm:
-    group: Applications/Internet

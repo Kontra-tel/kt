@@ -34,9 +34,9 @@ contents:
   #   dst: /opt/${APP}/resources
 
   # Launch script — installed to /usr/bin so the app is on PATH.
-  # Edit deploy/bin/${APP} to invoke your binary or interpreter.
+  # Edit deploy/bin/{{.App}} to invoke your binary or interpreter.
   # Remove this block if the package installs no runnable entry point.
-  - src: deploy/bin/${APP}
+  - src: deploy/bin/{{.App}}
     dst: /usr/bin/${APP}
     file_info:
       mode: 0755
@@ -49,7 +49,7 @@ contents:
 
   # systemd service unit.
   # Remove this block and the scripts section below for CLI-only packages.
-  - src: deploy/systemd/${APP}.service
+  - src: deploy/systemd/{{.App}}.service
     dst: /etc/systemd/system/${APP}.service
 
 # Install and removal hooks.
@@ -58,6 +58,3 @@ scripts:
   postinstall: deploy/scripts/postinstall.sh
   preremove: deploy/scripts/preremove.sh
 
-overrides:
-  rpm:
-    group: Applications/Internet
