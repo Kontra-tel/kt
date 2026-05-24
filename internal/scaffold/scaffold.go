@@ -23,18 +23,45 @@ type Context struct {
 
 type Scaffolder struct{ FS embed.FS }
 
+type TemplateInfo struct {
+	Name string
+	Desc string
+}
+
 func (s Scaffolder) Templates() ([]string, error) {
+	infos, err := s.TemplatesWithDesc()
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, len(infos))
+	for i, t := range infos {
+		names[i] = t.Name
+	}
+	return names, nil
+}
+
+func (s Scaffolder) TemplatesWithDesc() ([]TemplateInfo, error) {
 	entries, err := fs.ReadDir(s.FS, "templates/projects")
 	if err != nil {
 		return nil, err
 	}
-	var out []string
+	var out []TemplateInfo
 	for _, e := range entries {
-		if e.IsDir() {
-			out = append(out, e.Name())
+		if !e.IsDir() {
+			continue
 		}
+		info := TemplateInfo{Name: e.Name()}
+		if data, err := s.FS.ReadFile("templates/projects/" + e.Name() + "/template.yaml"); err == nil {
+			for _, line := range strings.Split(string(data), "\n") {
+				if k, v, ok := strings.Cut(strings.TrimSpace(line), ":"); ok && strings.TrimSpace(k) == "description" {
+					info.Desc = strings.TrimSpace(v)
+					break
+				}
+			}
+		}
+		out = append(out, info)
 	}
-	sort.Strings(out)
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
 }
 

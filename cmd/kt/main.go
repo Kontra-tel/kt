@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"git.kontra.tel/kontra.tel/build-tools/internal/assets"
+	"git.kontra.tel/kontra.tel/build-tools/internal/ktconfig"
 	"git.kontra.tel/kontra.tel/build-tools/internal/scaffold"
 	"git.kontra.tel/kontra.tel/build-tools/internal/tui"
 	"git.kontra.tel/kontra.tel/build-tools/internal/updater"
@@ -64,6 +65,9 @@ Usage:
   kt init <template> <app> [--dir .] [--port 8080] [--user app] [--group app]
   kt install-tools [--dir .] [--force]
   kt update-tools [--dir .] [--force]
+  kt config get <key>
+  kt config set <key> <value>
+  kt config show
   kt config init|diff|check
   kt release patch|minor|major
   kt update [--check]
@@ -82,7 +86,7 @@ Examples:
 
 func cmdInit(s scaffold.Scaffolder, args []string) {
 	var positional []string
-	dir, port, user, group, author := ".", "8080", "", "", ""
+	dir, port, user, group, author := ".", "", "", "", ""
 	force := false
 	for i := 0; i < len(args); i++ {
 		a := args[i]
@@ -118,29 +122,70 @@ func cmdInit(s scaffold.Scaffolder, args []string) {
 			positional = append(positional, a)
 		}
 	}
-	if len(positional) < 2 {
-		tui.Err("usage: kt init <template> <app>")
-		os.Exit(2)
+
+	var tmplName, appName string
+	if len(positional) >= 2 {
+		tmplName, appName = positional[0], positional[1]
+	} else {
+		tmplName, appName = promptInit(s, positional)
 	}
-	ctx := scaffold.Context{Template: positional[0], App: positional[1], Port: port, ServiceUser: user, ServiceGroup: group, Author: author}
+
+	ctx := scaffold.Context{Template: tmplName, App: appName, Port: port, ServiceUser: user, ServiceGroup: group, Author: author}
 	tui.Header("Initializing " + ctx.App)
 	if err := s.Init(dir, ctx, force); err != nil {
 		tui.Err(err.Error())
 		os.Exit(1)
 	}
 	tui.OK("created project structure")
-	tui.Info("next: make doctor && make build && make package")
+	tui.Info("next: cd " + appName + " && make doctor && make build && make package")
 }
 
-func cmdTemplates(s scaffold.Scaffolder) {
-	tui.Header("Available templates")
-	t, err := s.Templates()
+func promptInit(s scaffold.Scaffolder, positional []string) (tmplName, appName string) {
+	infos, err := s.TemplatesWithDesc()
 	if err != nil {
 		tui.Err(err.Error())
 		os.Exit(1)
 	}
-	for _, name := range t {
-		tui.Info(name)
+	labels := make([]string, len(infos))
+	maxLen := 0
+	for _, t := range infos {
+		if len(t.Name) > maxLen {
+			maxLen = len(t.Name)
+		}
+	}
+	for i, t := range infos {
+		labels[i] = fmt.Sprintf("%-*s  %s%s%s", maxLen, t.Name, tui.Dim, t.Desc, tui.Reset)
+	}
+	idx := tui.Select("Choose a template", labels)
+	tmplName = infos[idx].Name
+
+	if len(positional) >= 1 {
+		appName = positional[0]
+	} else {
+		appName = tui.Input("App name", "")
+		for appName == "" {
+			tui.Err("app name is required")
+			appName = tui.Input("App name", "")
+		}
+	}
+	return
+}
+
+func cmdTemplates(s scaffold.Scaffolder) {
+	tui.Header("Available templates")
+	infos, err := s.TemplatesWithDesc()
+	if err != nil {
+		tui.Err(err.Error())
+		os.Exit(1)
+	}
+	maxLen := 0
+	for _, t := range infos {
+		if len(t.Name) > maxLen {
+			maxLen = len(t.Name)
+		}
+	}
+	for _, t := range infos {
+		tui.Info(fmt.Sprintf("%-*s  %s", maxLen, t.Name, t.Desc))
 	}
 }
 
@@ -159,10 +204,44 @@ func cmdInstallTools(s scaffold.Scaffolder, args []string) {
 
 func cmdConfig(args []string) {
 	if len(args) < 1 {
-		tui.Err("usage: kt config init|diff|check")
+		tui.Err("usage: kt config get <key> | set <key> <value> | show | init|diff|check")
 		os.Exit(2)
 	}
-	runMake("config-" + args[0])
+	switch args[0] {
+	case "get":
+		if len(args) < 2 {
+			tui.Err("usage: kt config get <key>")
+			os.Exit(2)
+		}
+		val, err := ktconfig.Get(args[1])
+		if err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
+		fmt.Println(val)
+	case "set":
+		if len(args) < 3 {
+			tui.Err("usage: kt config set <key> <value>")
+			os.Exit(2)
+		}
+		if err := ktconfig.Set(args[1], args[2]); err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
+		tui.OK(args[1] + " = " + args[2])
+	case "show":
+		pairs, err := ktconfig.All()
+		if err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
+		tui.Header("Project config")
+		for _, p := range pairs {
+			tui.Info(p[0] + ": " + p[1])
+		}
+	default:
+		runMake("config-" + args[0])
+	}
 }
 
 func cmdRelease(args []string) {

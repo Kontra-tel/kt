@@ -1,6 +1,3 @@
-APP := {{.App}}
-SERVICE_NAME := {{.App}}
-VERSION := $(shell cat version.txt)
 DOCTOR_TOOLS := git make java mvn nfpm systemctl
 
 include .kt/mk/common.mk
@@ -9,7 +6,7 @@ include .kt/mk/config.mk
 include .kt/mk/doctor.mk
 include .kt/mk/nfpm.mk
 
-.PHONY: test build run install restart logs status
+.PHONY: test build run install
 
 test: ## Run tests
 	mvn -B -ntp test
@@ -17,18 +14,9 @@ test: ## Run tests
 build: ## Build Java artifact
 	mvn -B -ntp clean package -DskipTests
 	mkdir -p dist/app
-	cp target/*.jar dist/app/{{.App}}.jar
+	cp target/*.jar dist/app/$(APP).jar
 
 run: build ## Run locally
-	java -jar dist/app/{{.App}}.jar
+	java -jar dist/app/$(APP).jar
 
 install: local-install ## Install package on this machine
-
-restart: ## Restart service
-	sudo systemctl restart $(SERVICE_NAME)
-
-logs: ## Follow logs
-	journalctl -u $(SERVICE_NAME) -f
-
-status: ## Service status
-	systemctl status $(SERVICE_NAME) --no-pager -l

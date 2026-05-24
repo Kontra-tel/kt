@@ -1,6 +1,3 @@
-APP := {{.App}}
-SERVICE_NAME := {{.App}}
-VERSION := $(shell cat version.txt)
 DOCTOR_TOOLS := git make nfpm systemctl
 
 include .kt/mk/common.mk
@@ -9,26 +6,17 @@ include .kt/mk/config.mk
 include .kt/mk/doctor.mk
 include .kt/mk/nfpm.mk
 
-.PHONY: test build install restart logs status
+.PHONY: test build install
 
 test: ## Run tests
 	@echo "TODO: add test command"
 
 build: ## Build application binary
-	@# Build your binary and place it at dist/app/{{.App}}
+	@# Build your binary and place it at dist/app/$(APP)
 	@# Example for a compiled language:
-	@#   mkdir -p dist/app && <compiler> -o dist/app/{{.App}} src/
+	@#   mkdir -p dist/app && <compiler> -o dist/app/$(APP) src/
 	@# Example for an interpreted language:
 	@#   mkdir -p dist/app && cp -r src/ dist/app/
 	mkdir -p dist/app
 
 install: local-install ## Install package on this machine
-
-restart: ## Restart service
-	sudo systemctl restart $(SERVICE_NAME)
-
-logs: ## Follow logs
-	journalctl -u $(SERVICE_NAME) -f
-
-status: ## Service status
-	systemctl status $(SERVICE_NAME) --no-pager -l

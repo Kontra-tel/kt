@@ -1,7 +1,7 @@
 SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
 
-APP ?= app
+APP ?= $(shell kt config get app 2>/dev/null)
 VERSION_FILE ?= version.txt
 VERSION ?= $(shell test -f $(VERSION_FILE) && cat $(VERSION_FILE) || echo 0.1.0)
 DIST_DIR ?= dist

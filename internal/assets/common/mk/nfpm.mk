@@ -8,7 +8,7 @@ NFPM_ARCH ?= $(shell uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/;s/armv7l/a
 
 package: build ## Build package with nFPM (override: NFPM_PACKAGER=deb|rpm|archlinux)
 	@mkdir -p dist
-	ARCH=$(NFPM_ARCH) nfpm package -f $(NFPM_CONFIG) -p $(NFPM_PACKAGER) -t dist/
+	APP=$(APP) ARCH=$(NFPM_ARCH) VERSION=$(VERSION) nfpm package -f $(NFPM_CONFIG) -p $(NFPM_PACKAGER) -t dist/
 
 package-deb: build ## Build .deb package explicitly
 	@mkdir -p dist

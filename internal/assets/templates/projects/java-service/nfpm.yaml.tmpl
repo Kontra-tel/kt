@@ -1,19 +1,19 @@
-name: {{.App}}
+name: ${APP}
 arch: ${ARCH}
 platform: linux
 version: ${VERSION}
 section: default
 priority: optional
 maintainer: {{.Author}}
-description: {{.App}} Java service
+description: ${APP} Java service
 contents:
-  - src: dist/app/{{.App}}.jar
-    dst: /opt/{{.App}}/{{.App}}.jar
+  - src: dist/app/${APP}.jar
+    dst: /opt/${APP}/${APP}.jar
   - src: deploy/config/*.example
-    dst: /etc/{{.App}}/
+    dst: /etc/${APP}/
     type: config|noreplace
-  - src: deploy/systemd/{{.App}}.service
-    dst: /etc/systemd/system/{{.App}}.service
+  - src: deploy/systemd/${APP}.service
+    dst: /etc/systemd/system/${APP}.service
 scripts:
   postinstall: deploy/scripts/postinstall.sh
   preremove: deploy/scripts/preremove.sh

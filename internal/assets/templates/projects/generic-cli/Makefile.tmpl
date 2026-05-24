@@ -1,5 +1,3 @@
-APP := {{.App}}
-VERSION := $(shell cat version.txt)
 DOCTOR_TOOLS := git make nfpm
 
 include .kt/mk/common.mk
@@ -14,10 +12,10 @@ test: ## Run tests
 	@echo "TODO: add test command"
 
 build: ## Build binary
-	@echo "TODO: build binary to dist/app/usr/local/bin/{{.App}}"
+	@echo "TODO: build binary to dist/app/usr/local/bin/$(APP)"
 	@mkdir -p dist/app/usr/local/bin
 
 run: build ## Run locally
-	./dist/app/usr/local/bin/{{.App}}
+	./dist/app/usr/local/bin/$(APP)
 
 install: local-install ## Install package on this machine

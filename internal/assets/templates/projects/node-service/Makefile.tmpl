@@ -1,6 +1,3 @@
-APP := {{.App}}
-SERVICE_NAME := {{.App}}
-VERSION := $(shell cat version.txt)
 DOCTOR_TOOLS := git make node npm nfpm systemctl
 
 include .kt/mk/common.mk
@@ -9,7 +6,7 @@ include .kt/mk/config.mk
 include .kt/mk/doctor.mk
 include .kt/mk/nfpm.mk
 
-.PHONY: test build run install restart logs status
+.PHONY: test build run install
 
 test: ## Run tests
 	npm test
@@ -25,12 +22,3 @@ run: build ## Run locally
 	node dist/app/server/index.mjs
 
 install: local-install ## Install package on this machine
-
-restart: ## Restart service
-	sudo systemctl restart $(SERVICE_NAME)
-
-logs: ## Follow logs
-	journalctl -u $(SERVICE_NAME) -f
-
-status: ## Service status
-	systemctl status $(SERVICE_NAME) --no-pager -l

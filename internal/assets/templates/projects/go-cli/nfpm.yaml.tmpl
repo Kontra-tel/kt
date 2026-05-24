@@ -1,14 +1,14 @@
-name: {{.App}}
+name: ${APP}
 arch: ${ARCH}
 platform: linux
 version: ${VERSION}
 section: default
 priority: optional
 maintainer: {{.Author}}
-description: {{.App}} CLI
+description: ${APP} CLI
 contents:
-  - src: dist/app/usr/local/bin/{{.App}}
-    dst: /usr/local/bin/{{.App}}
+  - src: dist/app/usr/local/bin/${APP}
+    dst: /usr/local/bin/${APP}
 overrides:
   rpm:
     group: Applications/System
