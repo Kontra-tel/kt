@@ -1,0 +1,14 @@
+#!/bin/sh
+# Launch script for {{.App}} frontend
+# ──────────────────────────────────────────────────────────────────────────────
+# Installed to /usr/bin/{{.App}}-frontend by nFPM.
+# Used by the systemd unit (ExecStart) and for running the frontend directly.
+#
+# Edit the exec line below to match your frontend runtime. Examples:
+#
+#   Node (Nuxt 3):  exec /usr/bin/node /opt/{{.App}}/frontend/server/index.mjs "$@"
+#   Node (Express): exec /usr/bin/node /opt/{{.App}}/frontend/index.js "$@"
+#   Go binary:      exec /opt/{{.App}}/frontend/{{.App}}-frontend "$@"
+# ──────────────────────────────────────────────────────────────────────────────
+
+exec /usr/bin/node /opt/{{.App}}/frontend/server/index.mjs "$@"

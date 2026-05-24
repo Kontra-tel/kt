@@ -4,12 +4,8 @@
 
 | Template | Description |
 | --- | --- |
-| `generic-service` | Language-agnostic systemd service skeleton |
-| `generic-cli` | Language-agnostic CLI binary skeleton |
-| `go-cli` | Go CLI binary packaged with nFPM |
-| `java-service` | Java systemd service packaged with nFPM |
-| `node-service` | Node.js systemd service packaged with nFPM (Nuxt 3) |
-| `multi-service` | Java backend + Node.js frontend as a single package |
+| `app` | Language-agnostic application — service, daemon, or CLI |
+| `multi` | Two-service application packaged as a single unit (backend + frontend) |
 
 ## Template variables
 
@@ -21,17 +17,42 @@
 | `{{.ServiceUser}}` | `<app>` | systemd service user |
 | `{{.ServiceGroup}}` | `<user>` | systemd service group |
 
+## Deploy folder layout
+
+The `deploy/` directory controls what nFPM installs and where. Remove any sub-directory you don't need:
+
+| Directory | Installed to | Purpose |
+| --- | --- | --- |
+| `deploy/bin/<app>` | `/usr/bin/<app>` | Launch script — invoked by systemd and directly from the shell |
+| `deploy/systemd/<app>.service` | `/etc/systemd/system/` | systemd service unit |
+| `deploy/config/*.example` | `/etc/<app>/` | Runtime config examples (all formats) |
+| `deploy/scripts/postinstall.sh` | nFPM hook | Creates service user, copies config, starts service |
+| `deploy/scripts/preremove.sh` | nFPM hook | Stops and disables service before removal |
+
+### CLI-only apps
+
+Remove `deploy/systemd/` and `deploy/scripts/`, then delete the corresponding
+blocks from `nfpm.yaml`. The launch script in `deploy/bin/` is still packaged
+to `/usr/bin/<app>` so the binary is on PATH.
+
+### Service-only apps (no CLI entry point)
+
+Remove `deploy/bin/` and its nfpm.yaml content block. Update `ExecStart` in
+the service unit to invoke the binary or interpreter directly.
+
 ## File renames
 
 Files ending in `.tmpl` are rendered through Go `text/template` and written without the suffix.
-The following path segments are also renamed:
+The following path segments are also renamed at scaffold time:
 
-| Source | Output |
+| Source pattern | Output |
 | --- | --- |
-| `app.service.tmpl` | `<app>.service` |
-| `backend.service.tmpl` | `<app>-backend.service` |
-| `frontend.service.tmpl` | `<app>-frontend.service` |
-| `cmd/app/` | `cmd/<app>/` |
+| `deploy/bin/app` | `deploy/bin/<app>` |
+| `deploy/bin/app-backend` | `deploy/bin/<app>-backend` |
+| `deploy/bin/app-frontend` | `deploy/bin/<app>-frontend` |
+| `deploy/systemd/app.service.tmpl` | `deploy/systemd/<app>.service` |
+| `deploy/systemd/backend.service.tmpl` | `deploy/systemd/<app>-backend.service` |
+| `deploy/systemd/frontend.service.tmpl` | `deploy/systemd/<app>-frontend.service` |
 | `.gitignore.tmpl` | `.gitignore` |
 
 ## Scaffolded structure
@@ -43,82 +64,95 @@ Makefile
 nfpm.yaml
 version.txt
 .gitignore
-deploy/
-  config/
-    app.env.example
 .kt/
+  project.yaml
   mk/
   scripts/
-```
-
-Service templates (`java-service`, `node-service`, `multi-service`) additionally produce:
-
-```text
 deploy/
+  bin/
+    <app>              # launch script — edit to set your runtime command
+  systemd/
+    <app>.service
+  config/
+    app.env.example
   scripts/
     postinstall.sh
     preremove.sh
-  systemd/
-    <app>.service
 ```
 
-The `go-cli` template additionally produces `go.mod` and `cmd/<app>/main.go`.
+The `multi` template additionally produces:
 
-The `generic-cli` template produces only the packaging skeleton (no systemd units or install scripts) — fill in the `build` target in the `Makefile` for your language/toolchain.
+```text
+deploy/
+  bin/
+    <app>-backend
+    <app>-frontend
+  systemd/
+    <app>-backend.service
+    <app>-frontend.service
+```
+
+## Launch script
+
+`deploy/bin/<app>` is a thin shell wrapper installed to `/usr/bin/<app>`.
+It is the single point of invocation for both systemd and manual use:
+
+```sh
+# Edit this line to match your runtime:
+exec /opt/myapp/myapp "$@"                                        # native binary
+exec java ${JAVA_OPTS:--Xmx512m} -jar /opt/myapp/myapp.jar "$@"  # Java
+exec /usr/bin/node /opt/myapp/server/index.mjs "$@"               # Node (Nuxt 3)
+exec /usr/bin/python3 /opt/myapp/main.py "$@"                     # Python
+```
+
+The systemd unit simply does `ExecStart=/usr/bin/<app>` — interpreter-specific
+flags belong in the launch script, not the unit file.
 
 ## Examples
 
-### Java service
+### Simple service
 
 ```bash
-kt init java-service my-api
+kt init app my-api
 cd my-api
+# Edit deploy/bin/my-api — set exec to your binary or interpreter
+# Edit Makefile — add your build command
 make doctor
-make config-init   # creates deploy/config/app.env from the example
+make config-init
 make build
-make install
+make package
+```
+
+### CLI tool (no daemon)
+
+```bash
+kt init app my-tool
+cd my-tool
+# Delete deploy/systemd/ and deploy/scripts/
+# Remove the systemd and scripts sections from nfpm.yaml
+# Edit deploy/bin/my-tool — set exec to your binary
+make build
+make package
 ```
 
 ### Multi-service app
 
-Scaffolds a Java backend and a Node.js frontend packaged and deployed as a single unit.
-
 ```bash
-kt init multi-service my-app
-cd my-app
+kt init multi my-platform
+cd my-platform
+# Edit deploy/bin/my-platform-backend and deploy/bin/my-platform-frontend
 make build
-make install
-```
-
-### Generic CLI
-
-Language-agnostic skeleton — fill in the `build` target in `Makefile` for your toolchain.
-
-```bash
-kt init generic-cli my-tool
-cd my-tool
-# edit Makefile — add your build command
-make build
-make install
-```
-
-### Go CLI
-
-```bash
-kt init go-cli my-tool
-cd my-tool
-make build
-make install
+make package
 ```
 
 ## Config files
 
-Config example files live in `deploy/config/` and are named `<name>.<format>.example`, e.g.:
+Config example files live in `deploy/config/` and are named `<name>.<format>.example`:
 
 ```text
-deploy/config/app.env.example       # KEY=VALUE env vars (default)
-deploy/config/app.yaml.example      # YAML
-deploy/config/app.ini.example       # INI
+deploy/config/app.env.example         # KEY=VALUE env vars (default)
+deploy/config/app.yaml.example        # YAML
+deploy/config/app.ini.example         # INI
 deploy/config/app.properties.example  # Java-style properties
 ```
 
@@ -129,7 +163,7 @@ Rules:
 - `make config-init` copies every `*.example` → the same name without `.example`, without overwriting existing files.
 - `postinstall.sh` does the same on the target machine after package install.
 
-The systemd `EnvironmentFile` directive only supports `KEY=VALUE` format. For YAML/INI/properties config, have your application read the file directly (e.g. pass the path via `ExecStart` argument or an env var pointing to the file).
+The systemd `EnvironmentFile` directive only supports `KEY=VALUE` format. For structured config (YAML/INI/properties), have your application read the file directly and pass its path via an env var in `app.env` or an argument in the launch script.
 
 ## systemd hardening
 
@@ -143,13 +177,6 @@ ReadWritePaths=/opt/<app>
 ```
 
 Adjust `ReadWritePaths` if the service writes data outside `/opt/<app>`.
-
-The Node.js service unit includes comments showing the correct `ExecStart` path for common frameworks:
-
-```ini
-# Nuxt 3:  /usr/bin/node /opt/<app>/server/index.mjs
-# Express: /usr/bin/node /opt/<app>/index.js
-```
 
 ## Adding a new template
 

@@ -1,0 +1,36 @@
+# DOCTOR_TOOLS — space-separated list of tools your build requires.
+# `make doctor` checks each one is present on PATH.
+# Add compilers, runtimes, or build tools for both the backend and frontend.
+DOCTOR_TOOLS := git make nfpm
+
+# ── Shared tooling ─────────────────────────────────────────────────────────────
+# These includes provide: APP (from .kt/project.yaml), VERSION (from version.txt),
+# help, config-init/check/diff, doctor, bump-patch/minor/major, and package targets.
+# Do not edit — run `kt update-tools` to pull in the latest versions.
+include .kt/mk/common.mk
+include .kt/mk/version.mk
+include .kt/mk/config.mk
+include .kt/mk/doctor.mk
+include .kt/mk/nfpm.mk
+
+# ── Project targets ────────────────────────────────────────────────────────────
+
+.PHONY: test build-backend build-frontend build install
+
+test: ## Run backend and frontend tests
+	@echo "TODO: add backend test command"
+	@echo "TODO: add frontend test command"
+
+# Build backend — place output in dist/app/backend/
+build-backend: ## Build backend
+	@echo "TODO: add backend build command"
+	@mkdir -p dist/app/backend
+
+# Build frontend — place output in dist/app/frontend/
+build-frontend: ## Build frontend
+	@echo "TODO: add frontend build command"
+	@mkdir -p dist/app/frontend
+
+build: build-backend build-frontend ## Build all components
+
+install: local-install ## Install package on this machine

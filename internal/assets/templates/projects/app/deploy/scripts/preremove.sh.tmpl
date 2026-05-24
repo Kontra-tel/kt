@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# preremove.sh — runs before the package is removed from the target machine.
+set -euo pipefail
+
+systemctl stop {{.App}} || true
+systemctl disable {{.App}} || true
+systemctl daemon-reload

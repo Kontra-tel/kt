@@ -1,0 +1,57 @@
+# nFPM package manifest — https://nfpm.goreleaser.com/configuration/
+#
+# Build packages with:
+#   make package          — build for the native arch (deb + rpm + apk)
+#   make package-deb      — .deb only
+#   make package-rpm      — .rpm only
+#
+# APP, ARCH, and VERSION are injected by nfpm.mk at build time:
+#   APP     — from .kt/project.yaml via `kt config get app`
+#   ARCH    — host architecture (amd64, arm64, …)
+#   VERSION — content of version.txt
+
+# ── Package identity ───────────────────────────────────────────────────────────
+name: ${APP}
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+section: default
+priority: optional
+maintainer: {{.Author}}
+description: ${APP}
+
+# ── Package contents ───────────────────────────────────────────────────────────
+contents:
+  # Application files — adjust src to match your build output.
+  # `make build` should populate dist/app/ before `make package` is called.
+  - src: dist/app
+    dst: /opt/${APP}
+
+  # Launch script — installed to /usr/bin so the app is on PATH.
+  # Edit deploy/bin/${APP} to invoke your binary or interpreter.
+  # Remove this block if the package installs no runnable entry point.
+  - src: deploy/bin/${APP}
+    dst: /usr/bin/${APP}
+    file_info:
+      mode: 0755
+
+  # Runtime config examples — all *.example files are packaged and copied
+  # to actual config by postinstall.sh. Non-example files are gitignored.
+  - src: deploy/config/*.example
+    dst: /etc/${APP}/
+    type: config|noreplace
+
+  # systemd service unit.
+  # Remove this block and the scripts section below for CLI-only packages.
+  - src: deploy/systemd/${APP}.service
+    dst: /etc/systemd/system/${APP}.service
+
+# Install and removal hooks.
+# Remove both lines if this package has no daemon component.
+scripts:
+  postinstall: deploy/scripts/postinstall.sh
+  preremove: deploy/scripts/preremove.sh
+
+overrides:
+  rpm:
+    group: Applications/Internet

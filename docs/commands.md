@@ -15,9 +15,9 @@ kt init <template> <app> [options]                   # explicit
 | `--force` | `false` | Overwrite existing files |
 
 ```bash
-kt init java-service my-api
-kt init go-cli my-tool
-kt init multi-service my-app --dir /srv/projects
+kt init app my-api
+kt init multi my-platform
+kt init app my-tool --dir /srv/projects
 ```
 
 Service user, group, and package maintainer are derived from the app name and git config automatically. Edit the generated files directly if you need to override them.

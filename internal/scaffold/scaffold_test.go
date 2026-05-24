@@ -28,7 +28,7 @@ func TestTemplatesWithDesc(t *testing.T) {
 		byName[ti.Name] = ti.Desc
 	}
 
-	for _, name := range []string{"generic-service", "generic-cli", "go-cli", "java-service", "node-service", "multi-service"} {
+	for _, name := range []string{"app", "multi"} {
 		if _, ok := byName[name]; !ok {
 			t.Errorf("template %q not found", name)
 		}
@@ -66,7 +66,7 @@ func TestTemplates(t *testing.T) {
 // TestInit_MissingApp checks that Init fails without an app name.
 func TestInit_MissingApp(t *testing.T) {
 	s := newScaffolder()
-	err := s.Init(t.TempDir(), scaffold.Context{Template: "go-cli"}, false)
+	err := s.Init(t.TempDir(), scaffold.Context{Template: "app"}, false)
 	if err == nil {
 		t.Fatal("expected error for missing app name, got nil")
 	}
@@ -81,11 +81,12 @@ func TestInit_UnknownTemplate(t *testing.T) {
 	}
 }
 
-// TestInit_GoCliFiles checks that the go-cli template produces the expected files.
-func TestInit_GoCliFiles(t *testing.T) {
+// TestInit_AppFiles checks that the app template produces the expected files,
+// including the renamed launch script and service unit.
+func TestInit_AppFiles(t *testing.T) {
 	s := newScaffolder()
 	dir := t.TempDir()
-	if err := s.Init(dir, scaffold.Context{Template: "go-cli", App: "my-tool"}, false); err != nil {
+	if err := s.Init(dir, scaffold.Context{Template: "app", App: "my-tool"}, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -97,18 +98,36 @@ func TestInit_GoCliFiles(t *testing.T) {
 		".kt/project.yaml",
 		".kt/mk/common.mk",
 		".kt/mk/nfpm.mk",
-		"go.mod",
-		"cmd/my-tool/main.go",
+		"deploy/bin/my-tool",
+		"deploy/systemd/my-tool.service",
 		"deploy/config/app.env.example",
+		"deploy/scripts/postinstall.sh",
+		"deploy/scripts/preremove.sh",
 	)
 }
 
-// TestInit_JavaServiceFiles checks that the java-service template produces the expected files,
-// including the correctly renamed service unit.
-func TestInit_JavaServiceFiles(t *testing.T) {
+// TestInit_AppBinExecutable checks that the deploy/bin/ launch script is executable.
+func TestInit_AppBinExecutable(t *testing.T) {
 	s := newScaffolder()
 	dir := t.TempDir()
-	ctx := scaffold.Context{Template: "java-service", App: "my-api", ServiceUser: "svc", ServiceGroup: "svc"}
+	if err := s.Init(dir, scaffold.Context{Template: "app", App: "my-tool"}, false); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(filepath.Join(dir, "deploy/bin/my-tool"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&0111 == 0 {
+		t.Error("deploy/bin/my-tool is not executable")
+	}
+}
+
+// TestInit_MultiFiles checks that the multi template produces the expected files,
+// including backend/frontend launch scripts and service units.
+func TestInit_MultiFiles(t *testing.T) {
+	s := newScaffolder()
+	dir := t.TempDir()
+	ctx := scaffold.Context{Template: "multi", App: "my-app", ServiceUser: "svc", ServiceGroup: "svc"}
 	if err := s.Init(dir, ctx, false); err != nil {
 		t.Fatal(err)
 	}
@@ -117,10 +136,13 @@ func TestInit_JavaServiceFiles(t *testing.T) {
 		"Makefile",
 		"nfpm.yaml",
 		".kt/project.yaml",
-		"deploy/systemd/my-api.service",
+		"deploy/bin/my-app-backend",
+		"deploy/bin/my-app-frontend",
+		"deploy/systemd/my-app-backend.service",
+		"deploy/systemd/my-app-frontend.service",
+		"deploy/config/app.env.example",
 		"deploy/scripts/postinstall.sh",
 		"deploy/scripts/preremove.sh",
-		"deploy/config/app.env.example",
 	)
 }
 
@@ -128,7 +150,7 @@ func TestInit_JavaServiceFiles(t *testing.T) {
 func TestInit_ProjectYAML(t *testing.T) {
 	s := newScaffolder()
 	dir := t.TempDir()
-	ctx := scaffold.Context{Template: "java-service", App: "my-api", ServiceUser: "svc", ServiceGroup: "ops"}
+	ctx := scaffold.Context{Template: "app", App: "my-api", ServiceUser: "svc", ServiceGroup: "ops"}
 	if err := s.Init(dir, ctx, false); err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +161,7 @@ func TestInit_ProjectYAML(t *testing.T) {
 	}
 	content := string(data)
 
-	for _, want := range []string{"app: my-api", "user: svc", "group: ops", "template: java-service"} {
+	for _, want := range []string{"app: my-api", "user: svc", "group: ops", "template: app"} {
 		if !strings.Contains(content, want) {
 			t.Errorf("project.yaml missing %q:\n%s", want, content)
 		}
@@ -150,7 +172,7 @@ func TestInit_ProjectYAML(t *testing.T) {
 // remains in output files.
 func TestInit_TemplateVarsRendered(t *testing.T) {
 	s := newScaffolder()
-	templates := []string{"java-service", "node-service", "go-cli", "generic-service", "generic-cli", "multi-service"}
+	templates := []string{"app", "multi"}
 	for _, tmpl := range templates {
 		t.Run(tmpl, func(t *testing.T) {
 			dir := t.TempDir()
@@ -178,17 +200,24 @@ func TestInit_TemplateVarsRendered(t *testing.T) {
 	}
 }
 
-// TestInit_ServiceFileRename checks that service units are renamed for all service templates.
+// TestInit_ServiceFileRename checks that service units and launch scripts are
+// renamed correctly for all templates.
 func TestInit_ServiceFileRename(t *testing.T) {
 	s := newScaffolder()
 	tests := []struct {
 		tmpl  string
 		files []string
 	}{
-		{"java-service", []string{"deploy/systemd/myapp.service"}},
-		{"node-service", []string{"deploy/systemd/myapp.service"}},
-		{"generic-service", []string{"deploy/systemd/myapp.service"}},
-		{"multi-service", []string{"deploy/systemd/myapp-backend.service", "deploy/systemd/myapp-frontend.service"}},
+		{"app", []string{
+			"deploy/systemd/myapp.service",
+			"deploy/bin/myapp",
+		}},
+		{"multi", []string{
+			"deploy/systemd/myapp-backend.service",
+			"deploy/systemd/myapp-frontend.service",
+			"deploy/bin/myapp-backend",
+			"deploy/bin/myapp-frontend",
+		}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.tmpl, func(t *testing.T) {
@@ -207,7 +236,7 @@ func TestInit_ServiceFileRename(t *testing.T) {
 func TestInit_NoOverwriteWithoutForce(t *testing.T) {
 	s := newScaffolder()
 	dir := t.TempDir()
-	ctx := scaffold.Context{Template: "go-cli", App: "my-tool"}
+	ctx := scaffold.Context{Template: "app", App: "my-tool"}
 
 	if err := s.Init(dir, ctx, false); err != nil {
 		t.Fatal(err)

@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# postinstall.sh — runs after the package is installed on the target machine.
+# Edit as needed; the steps below cover the common service setup.
+set -euo pipefail
+
+# ── Create service user ────────────────────────────────────────────────────────
+# A dedicated system user improves security isolation.
+NOLOGIN=$(command -v nologin 2>/dev/null || echo /usr/sbin/nologin)
+id -u {{.ServiceUser}} >/dev/null 2>&1 \
+  || useradd --system --home /opt/{{.App}} --shell "$NOLOGIN" {{.ServiceUser}}
+
+# ── Set up directories ─────────────────────────────────────────────────────────
+mkdir -p /etc/{{.App}} /opt/{{.App}}
+chown -R {{.ServiceUser}}:{{.ServiceGroup}} /opt/{{.App}}
+
+# ── Initialise config ──────────────────────────────────────────────────────────
+# Copy every *.example file to its actual counterpart without overwriting
+# existing files (preserves manual edits across upgrades).
+# Works with any config format: .env, .yaml, .ini, .properties, etc.
+for example in /etc/{{.App}}/*.example; do
+  [ -f "$example" ] || continue
+  target="${example%.example}"
+  [ -f "$target" ] || cp "$example" "$target"
+done
+
+# ── Start service ──────────────────────────────────────────────────────────────
+systemctl daemon-reload
+systemctl enable {{.App}}
+systemctl restart {{.App}}

@@ -1,0 +1,59 @@
+# nFPM package manifest — https://nfpm.goreleaser.com/configuration/
+#
+# Build packages with:
+#   make package          — build for the native arch (deb + rpm + apk)
+#   make package-deb      — .deb only
+#   make package-rpm      — .rpm only
+#
+# APP, ARCH, and VERSION are injected by nfpm.mk at build time:
+#   APP     — from .kt/project.yaml via `kt config get app`
+#   ARCH    — host architecture (amd64, arm64, …)
+#   VERSION — content of version.txt
+
+# ── Package identity ───────────────────────────────────────────────────────────
+name: ${APP}
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+section: default
+priority: optional
+maintainer: {{.Author}}
+description: ${APP} — backend and frontend
+
+# ── Package contents ───────────────────────────────────────────────────────────
+contents:
+  # Application files — `make build` should populate both dist/app/backend/
+  # and dist/app/frontend/ before `make package` is called.
+  - src: dist/app
+    dst: /opt/${APP}
+
+  # Backend launch script — edit deploy/bin/${APP}-backend to set the command.
+  - src: deploy/bin/${APP}-backend
+    dst: /usr/bin/${APP}-backend
+    file_info:
+      mode: 0755
+
+  # Frontend launch script — edit deploy/bin/${APP}-frontend to set the command.
+  - src: deploy/bin/${APP}-frontend
+    dst: /usr/bin/${APP}-frontend
+    file_info:
+      mode: 0755
+
+  # Runtime config examples (all formats — .env, .yaml, .ini, etc.)
+  - src: deploy/config/*.example
+    dst: /etc/${APP}/
+    type: config|noreplace
+
+  # systemd service units
+  - src: deploy/systemd/${APP}-backend.service
+    dst: /etc/systemd/system/${APP}-backend.service
+  - src: deploy/systemd/${APP}-frontend.service
+    dst: /etc/systemd/system/${APP}-frontend.service
+
+scripts:
+  postinstall: deploy/scripts/postinstall.sh
+  preremove: deploy/scripts/preremove.sh
+
+overrides:
+  rpm:
+    group: Applications/Internet

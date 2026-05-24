@@ -130,6 +130,8 @@ func copyTree(efs embed.FS, srcRoot, dstRoot string, ctx *Context, force bool) e
 			dstRel = strings.ReplaceAll(dstRel, "backend.service", ctx.App+"-backend.service")
 			dstRel = strings.ReplaceAll(dstRel, "frontend.service", ctx.App+"-frontend.service")
 			dstRel = strings.ReplaceAll(dstRel, "cmd/app", "cmd/"+ctx.App)
+			// deploy/bin/app → deploy/bin/<app>; also handles app-backend and app-frontend suffixes
+			dstRel = strings.ReplaceAll(dstRel, "deploy/bin/app", "deploy/bin/"+ctx.App)
 		}
 		if strings.HasSuffix(dstRel, ".tmpl") {
 			dstRel = strings.TrimSuffix(dstRel, ".tmpl")
@@ -162,7 +164,7 @@ func copyTree(efs embed.FS, srcRoot, dstRoot string, ctx *Context, force bool) e
 			return err
 		}
 		mode := fs.FileMode(0644)
-		if strings.HasSuffix(dst, ".sh") {
+		if strings.HasSuffix(dst, ".sh") || strings.Contains(dst, "/deploy/bin/") {
 			mode = 0755
 		}
 		return os.WriteFile(dst, data, mode)
@@ -188,7 +190,7 @@ func chmodScripts(root string) error {
 		if err != nil || d.IsDir() {
 			return err
 		}
-		if strings.HasSuffix(path, ".sh") {
+		if strings.HasSuffix(path, ".sh") || strings.Contains(path, "/deploy/bin/") {
 			return os.Chmod(path, 0755)
 		}
 		return nil

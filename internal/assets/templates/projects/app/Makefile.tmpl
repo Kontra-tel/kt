@@ -1,0 +1,41 @@
+# DOCTOR_TOOLS — space-separated list of tools your build requires.
+# `make doctor` checks each one is present on PATH.
+# Add your compiler, runtime, or build tool here (e.g. go, mvn, node, npm).
+DOCTOR_TOOLS := git make nfpm
+
+# ── Shared tooling ─────────────────────────────────────────────────────────────
+# These includes provide: APP (from .kt/project.yaml), VERSION (from version.txt),
+# help, config-init/check/diff, doctor, bump-patch/minor/major, and package targets.
+# Do not edit — run `kt update-tools` to pull in the latest versions.
+include .kt/mk/common.mk
+include .kt/mk/version.mk
+include .kt/mk/config.mk
+include .kt/mk/doctor.mk
+include .kt/mk/nfpm.mk
+
+# ── Project targets ────────────────────────────────────────────────────────────
+
+.PHONY: test build run install
+
+test: ## Run tests
+	@echo "TODO: add your test command"
+
+# Build your application and place output in dist/app/ so nFPM can find it.
+# The launch script deploy/bin/$(APP) is packaged to /usr/bin/$(APP) — edit it
+# to point to your binary or interpreter.
+build: ## Build application
+	@echo "TODO: add your build command"
+	@mkdir -p dist/app
+
+# Run locally using the launch script (mirrors how the installed binary is invoked).
+run: build ## Run locally
+	@sh deploy/bin/$(APP)
+
+install: local-install ## Install package on this machine
+
+# ── CLI-only apps ──────────────────────────────────────────────────────────────
+# If this app has no daemon component, remove:
+#   - deploy/systemd/       (service unit)
+#   - deploy/scripts/       (postinstall / preremove hooks)
+# And in nfpm.yaml, remove the systemd and scripts sections.
+# Remove `systemctl` from DOCTOR_TOOLS above too.

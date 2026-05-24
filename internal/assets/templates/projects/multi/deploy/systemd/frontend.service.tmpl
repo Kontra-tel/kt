@@ -1,0 +1,27 @@
+[Unit]
+Description={{.App}} frontend
+# Start after network and after the backend is up.
+After=network.target {{.App}}-backend.service
+
+[Service]
+User={{.ServiceUser}}
+Group={{.ServiceGroup}}
+WorkingDirectory=/opt/{{.App}}/frontend
+
+# Load KEY=VALUE runtime config. The leading '-' allows missing files.
+EnvironmentFile=-/etc/{{.App}}/app.env
+
+# Edit deploy/bin/{{.App}}-frontend to change the launch command.
+ExecStart=/usr/bin/{{.App}}-frontend
+
+Restart=on-failure
+RestartSec=5
+
+# ── Security hardening ─────────────────────────────────────────────────────────
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/{{.App}}
+
+[Install]
+WantedBy=multi-user.target
