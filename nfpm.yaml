@@ -1,12 +1,12 @@
 name: kt
-arch: amd64
+arch: ${ARCH}
 platform: linux
 version: ${VERSION}
 section: utils
 priority: optional
 maintainer: Kontra
 description: Tiny project scaffolding for Make, nFPM, and systemd
-homepage: https://git.kontra.tel/kontra.tel/build-tools
+homepage: https://git.kontra.tel/kontra.tel/kt
 license: MIT
 contents:
   - src: kt

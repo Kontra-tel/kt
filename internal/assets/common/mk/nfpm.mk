@@ -1,6 +1,6 @@
 NFPM_CONFIG ?= nfpm.yaml
 # Auto-detect package format from the system package manager if not overridden
-NFPM_PACKAGER ?= $(shell command -v dpkg >/dev/null 2>&1 && echo deb || (command -v rpm >/dev/null 2>&1 && echo rpm || echo deb))
+NFPM_PACKAGER ?= $(shell command -v dpkg >/dev/null 2>&1 && echo deb || (command -v rpm >/dev/null 2>&1 && echo rpm || (command -v pacman >/dev/null 2>&1 && echo archlinux || echo deb)))
 # Map uname -m to the arch names nFPM expects
 NFPM_ARCH ?= $(shell uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/;s/armv7l/armv7/')
 
