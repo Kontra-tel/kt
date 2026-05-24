@@ -20,5 +20,4 @@ build: ## Build Go binary
 run: build ## Run locally
 	./dist/app/usr/local/bin/{{.App}}
 
-install: package ## Install local deb
-	sudo dpkg -i dist/*.deb
+install: local-install ## Install package on this machine

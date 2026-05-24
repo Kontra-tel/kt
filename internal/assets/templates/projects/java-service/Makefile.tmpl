@@ -22,8 +22,7 @@ build: ## Build Java artifact
 run: build ## Run locally
 	java -jar dist/app/{{.App}}.jar
 
-install: package ## Install local deb
-	sudo dpkg -i dist/*.deb
+install: local-install ## Install package on this machine
 
 restart: ## Restart service
 	sudo systemctl restart $(SERVICE_NAME)

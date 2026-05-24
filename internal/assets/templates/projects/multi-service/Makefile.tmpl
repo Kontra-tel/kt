@@ -21,8 +21,7 @@ build: ## Build backend and frontend artifacts
 	cp backend/target/*.jar dist/app/backend/backend.jar
 	cp -r frontend/.output/* dist/app/frontend/ 2>/dev/null || cp -r frontend/dist/* dist/app/frontend/
 
-install: package ## Install local deb
-	sudo dpkg -i dist/*.deb
+install: local-install ## Install package on this machine
 
 restart: ## Restart services
 	sudo systemctl restart {{.App}}-backend {{.App}}-frontend

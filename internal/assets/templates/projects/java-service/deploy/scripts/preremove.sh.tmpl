@@ -2,3 +2,4 @@
 set -euo pipefail
 systemctl stop {{.App}} || true
 systemctl disable {{.App}} || true
+systemctl daemon-reload

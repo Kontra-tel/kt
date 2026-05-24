@@ -7,9 +7,15 @@ User={{.ServiceUser}}
 Group={{.ServiceGroup}}
 WorkingDirectory=/opt/{{.App}}/frontend
 EnvironmentFile=-/etc/{{.App}}/app.env
+# Nuxt 3: /usr/bin/node /opt/{{.App}}/frontend/server/index.mjs
+# Express/custom: /usr/bin/node /opt/{{.App}}/frontend/index.js
 ExecStart=/usr/bin/node /opt/{{.App}}/frontend/server/index.mjs
 Restart=always
 RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/{{.App}}
 
 [Install]
 WantedBy=multi-user.target

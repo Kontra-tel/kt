@@ -1,5 +1,5 @@
 name: {{.App}}
-arch: amd64
+arch: ${ARCH}
 platform: linux
 version: ${VERSION}
 section: default
@@ -9,3 +9,6 @@ description: {{.App}} CLI
 contents:
   - src: dist/app/usr/local/bin/{{.App}}
     dst: /usr/local/bin/{{.App}}
+overrides:
+  rpm:
+    group: Applications/System

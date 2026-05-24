@@ -10,6 +10,10 @@ EnvironmentFile=-/etc/{{.App}}/app.env
 ExecStart=/usr/bin/java $JAVA_OPTS -jar /opt/{{.App}}/backend/backend.jar
 Restart=always
 RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/{{.App}}
 
 [Install]
 WantedBy=multi-user.target

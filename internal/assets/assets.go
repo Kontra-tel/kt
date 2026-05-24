@@ -13,5 +13,5 @@ import "embed"
 //
 //	internal/assets/common/
 //
-//go:embed common/** templates/**
+//go:embed all:common all:templates
 var FS embed.FS

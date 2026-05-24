@@ -9,21 +9,22 @@ include .kt/mk/config.mk
 include .kt/mk/doctor.mk
 include .kt/mk/nfpm.mk
 
-.PHONY: test build install restart logs status
+.PHONY: test build run install restart logs status
 
 test: ## Run tests
 	npm test
 
-build: ## Build Node artifact
+build: ## Build Node application (Nuxt 3; adjust for other frameworks)
 	npm ci
 	npm run build
-	mkdir -p dist/app
-	cp -r package.json package-lock.json dist/app/ 2>/dev/null || true
-	cp -r dist/* dist/app/ 2>/dev/null || true
-	cp -r .output dist/app/ 2>/dev/null || true
+	rm -rf dist/app && mkdir -p dist/app
+	cp -r .output/. dist/app/
+	cp package.json dist/app/
 
-install: package ## Install local deb
-	sudo dpkg -i dist/*.deb
+run: build ## Run locally
+	node dist/app/server/index.mjs
+
+install: local-install ## Install package on this machine
 
 restart: ## Restart service
 	sudo systemctl restart $(SERVICE_NAME)

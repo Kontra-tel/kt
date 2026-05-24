@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-id -u {{.ServiceUser}} >/dev/null 2>&1 || useradd --system --home /opt/{{.App}} --shell /usr/sbin/nologin {{.ServiceUser}}
+NOLOGIN=$(command -v nologin 2>/dev/null || echo /usr/sbin/nologin)
+id -u {{.ServiceUser}} >/dev/null 2>&1 || useradd --system --home /opt/{{.App}} --shell "$NOLOGIN" {{.ServiceUser}}
 mkdir -p /etc/{{.App}} /opt/{{.App}}
 if [ ! -f /etc/{{.App}}/app.env ]; then cp /etc/{{.App}}/app.env.example /etc/{{.App}}/app.env; fi
 chown -R {{.ServiceUser}}:{{.ServiceGroup}} /opt/{{.App}}

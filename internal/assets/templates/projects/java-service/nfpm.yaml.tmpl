@@ -1,5 +1,5 @@
 name: {{.App}}
-arch: amd64
+arch: ${ARCH}
 platform: linux
 version: ${VERSION}
 section: default
@@ -17,3 +17,6 @@ contents:
 scripts:
   postinstall: deploy/scripts/postinstall.sh
   preremove: deploy/scripts/preremove.sh
+overrides:
+  rpm:
+    group: Applications/Internet
