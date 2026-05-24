@@ -51,6 +51,8 @@ It is **not** a deployment framework — it sets up the structure, then normal L
 
 | Template | Description |
 | --- | --- |
+| `generic-service` | Language-agnostic systemd service skeleton |
+| `generic-cli` | Language-agnostic CLI binary skeleton |
 | `go-cli` | Go CLI binary packaged with nFPM |
 | `java-service` | Java systemd service |
 | `node-service` | Node.js systemd service (Nuxt 3) |

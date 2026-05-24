@@ -5,10 +5,10 @@ version: ${VERSION}
 section: default
 priority: optional
 maintainer: {{.Author}}
-description: {{.App}} Java service
+description: {{.App}} service
 contents:
-  - src: dist/app/{{.App}}.jar
-    dst: /opt/{{.App}}/{{.App}}.jar
+  - src: dist/app
+    dst: /opt/{{.App}}
   - src: deploy/config/*.example
     dst: /etc/{{.App}}/
     type: config|noreplace

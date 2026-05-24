@@ -9,7 +9,11 @@ WorkingDirectory=/opt/{{.App}}
 # EnvironmentFile loads KEY=VALUE pairs only. For YAML/INI/properties config,
 # pass the path via an env var or argument in ExecStart instead.
 EnvironmentFile=-/etc/{{.App}}/app.env
-ExecStart=/usr/bin/java $JAVA_OPTS -jar /opt/{{.App}}/{{.App}}.jar
+# Update ExecStart to point to your binary or interpreter:
+#   Compiled binary:  ExecStart=/opt/{{.App}}/{{.App}}
+#   Python:           ExecStart=/usr/bin/python3 /opt/{{.App}}/main.py
+#   Shell script:     ExecStart=/opt/{{.App}}/start.sh
+ExecStart=/opt/{{.App}}/{{.App}}
 Restart=always
 RestartSec=10
 NoNewPrivileges=true

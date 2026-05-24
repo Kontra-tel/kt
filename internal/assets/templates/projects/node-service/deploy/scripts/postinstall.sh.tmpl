@@ -3,7 +3,11 @@ set -euo pipefail
 NOLOGIN=$(command -v nologin 2>/dev/null || echo /usr/sbin/nologin)
 id -u {{.ServiceUser}} >/dev/null 2>&1 || useradd --system --home /opt/{{.App}} --shell "$NOLOGIN" {{.ServiceUser}}
 mkdir -p /etc/{{.App}} /opt/{{.App}}
-if [ ! -f /etc/{{.App}}/app.env ]; then cp /etc/{{.App}}/app.env.example /etc/{{.App}}/app.env; fi
+for example in /etc/{{.App}}/*.example; do
+  [ -f "$example" ] || continue
+  target="${example%.example}"
+  [ -f "$target" ] || cp "$example" "$target"
+done
 chown -R {{.ServiceUser}}:{{.ServiceGroup}} /opt/{{.App}}
 systemctl daemon-reload
 systemctl enable {{.App}}

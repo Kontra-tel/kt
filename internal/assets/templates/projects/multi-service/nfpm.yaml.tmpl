@@ -9,8 +9,8 @@ description: {{.App}} multi-service application
 contents:
   - src: dist/app
     dst: /opt/{{.App}}
-  - src: deploy/config/app.env.example
-    dst: /etc/{{.App}}/app.env.example
+  - src: deploy/config/*.example
+    dst: /etc/{{.App}}/
     type: config|noreplace
   - src: deploy/systemd/{{.App}}-backend.service
     dst: /etc/systemd/system/{{.App}}-backend.service

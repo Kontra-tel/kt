@@ -1,0 +1,2 @@
+name: generic-service
+description: Generic systemd service skeleton — language and runtime agnostic

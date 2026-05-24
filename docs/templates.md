@@ -4,6 +4,8 @@
 
 | Template | Description |
 | --- | --- |
+| `generic-service` | Language-agnostic systemd service skeleton |
+| `generic-cli` | Language-agnostic CLI binary skeleton |
 | `go-cli` | Go CLI binary packaged with nFPM |
 | `java-service` | Java systemd service packaged with nFPM |
 | `node-service` | Node.js systemd service packaged with nFPM (Nuxt 3) |
@@ -63,6 +65,8 @@ deploy/
 
 The `go-cli` template additionally produces `go.mod` and `cmd/<app>/main.go`.
 
+The `generic-cli` template produces only the packaging skeleton (no systemd units or install scripts) — fill in the `build` target in the `Makefile` for your language/toolchain.
+
 ## Examples
 
 ### Java service
@@ -87,6 +91,18 @@ make build
 make install
 ```
 
+### Generic CLI
+
+Language-agnostic skeleton — fill in the `build` target in `Makefile` for your toolchain.
+
+```bash
+kt init generic-cli my-tool
+cd my-tool
+# edit Makefile — add your build command
+make build
+make install
+```
+
 ### Go CLI
 
 ```bash
@@ -95,6 +111,26 @@ cd my-tool
 make build
 make install
 ```
+
+## Config files
+
+Config example files live in `deploy/config/` and are named `<name>.<format>.example`, e.g.:
+
+```text
+deploy/config/app.env.example       # KEY=VALUE env vars (default)
+deploy/config/app.yaml.example      # YAML
+deploy/config/app.ini.example       # INI
+deploy/config/app.properties.example  # Java-style properties
+```
+
+Rules:
+
+- All `*.example` files are **tracked in git** and packaged into the `.deb`/`.rpm` under `/etc/<app>/`.
+- All non-`.example` files in `deploy/config/` are **gitignored** (actual runtime config).
+- `make config-init` copies every `*.example` → the same name without `.example`, without overwriting existing files.
+- `postinstall.sh` does the same on the target machine after package install.
+
+The systemd `EnvironmentFile` directive only supports `KEY=VALUE` format. For YAML/INI/properties config, have your application read the file directly (e.g. pass the path via `ExecStart` argument or an env var pointing to the file).
 
 ## systemd hardening
 
