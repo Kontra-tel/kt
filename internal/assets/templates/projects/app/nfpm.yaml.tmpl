@@ -27,6 +27,12 @@ contents:
   - src: dist/app
     dst: /opt/${APP}
 
+  # Additional runtime files (optional) — uncomment to package static assets,
+  # SQL migrations, config schemas, or other files your app reads from disk.
+  # These are taken directly from the repository, bypassing the build step.
+  # - src: resources
+  #   dst: /opt/${APP}/resources
+
   # Launch script — installed to /usr/bin so the app is on PATH.
   # Edit deploy/bin/${APP} to invoke your binary or interpreter.
   # Remove this block if the package installs no runnable entry point.
