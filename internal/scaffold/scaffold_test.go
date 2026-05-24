@@ -108,7 +108,7 @@ func TestInit_GoCliFiles(t *testing.T) {
 func TestInit_JavaServiceFiles(t *testing.T) {
 	s := newScaffolder()
 	dir := t.TempDir()
-	ctx := scaffold.Context{Template: "java-service", App: "my-api", Port: "4002", ServiceUser: "svc", ServiceGroup: "svc"}
+	ctx := scaffold.Context{Template: "java-service", App: "my-api", ServiceUser: "svc", ServiceGroup: "svc"}
 	if err := s.Init(dir, ctx, false); err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +128,7 @@ func TestInit_JavaServiceFiles(t *testing.T) {
 func TestInit_ProjectYAML(t *testing.T) {
 	s := newScaffolder()
 	dir := t.TempDir()
-	ctx := scaffold.Context{Template: "java-service", App: "my-api", Port: "4002", ServiceUser: "svc", ServiceGroup: "ops"}
+	ctx := scaffold.Context{Template: "java-service", App: "my-api", ServiceUser: "svc", ServiceGroup: "ops"}
 	if err := s.Init(dir, ctx, false); err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestInit_ProjectYAML(t *testing.T) {
 	}
 	content := string(data)
 
-	for _, want := range []string{"app: my-api", "port: 4002", "user: svc", "group: ops", "template: java-service"} {
+	for _, want := range []string{"app: my-api", "user: svc", "group: ops", "template: java-service"} {
 		if !strings.Contains(content, want) {
 			t.Errorf("project.yaml missing %q:\n%s", want, content)
 		}
@@ -154,7 +154,7 @@ func TestInit_TemplateVarsRendered(t *testing.T) {
 	for _, tmpl := range templates {
 		t.Run(tmpl, func(t *testing.T) {
 			dir := t.TempDir()
-			ctx := scaffold.Context{Template: tmpl, App: "testapp", Port: "8080", ServiceUser: "svc", ServiceGroup: "svc"}
+			ctx := scaffold.Context{Template: tmpl, App: "testapp", ServiceUser: "svc", ServiceGroup: "svc"}
 			if err := s.Init(dir, ctx, false); err != nil {
 				t.Fatal(err)
 			}
@@ -193,7 +193,7 @@ func TestInit_ServiceFileRename(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.tmpl, func(t *testing.T) {
 			dir := t.TempDir()
-			ctx := scaffold.Context{Template: tc.tmpl, App: "myapp", Port: "8080", ServiceUser: "svc", ServiceGroup: "svc"}
+			ctx := scaffold.Context{Template: tc.tmpl, App: "myapp", ServiceUser: "svc", ServiceGroup: "svc"}
 			if err := s.Init(dir, ctx, false); err != nil {
 				t.Fatal(err)
 			}

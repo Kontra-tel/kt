@@ -12,17 +12,15 @@ kt init <template> <app> [options]                   # explicit
 | Option | Default | Description |
 | --- | --- | --- |
 | `--dir` | `.` | Target directory |
-| `--port` | `8080` | Primary listen port |
-| `--user` | `<app>` | systemd service user |
-| `--group` | `<user>` | systemd service group |
-| `--author` | git config user.name + email | Package maintainer name |
 | `--force` | `false` | Overwrite existing files |
 
 ```bash
-kt init java-service my-api --port 4002 --user myapp --group myapp
-kt init go-cli my-tool --author "Alice"
-kt init multi-service my-app --port 4002 --force
+kt init java-service my-api
+kt init go-cli my-tool
+kt init multi-service my-app --dir /srv/projects
 ```
+
+Service user, group, and package maintainer are derived from the app name and git config automatically. Edit the generated files directly if you need to override them.
 
 ## kt templates
 

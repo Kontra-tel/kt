@@ -62,7 +62,7 @@ func usage() {
 
 Usage:
   kt templates
-  kt init <template> <app> [--dir .] [--port 8080] [--user app] [--group app]
+  kt init <template> <app> [--dir .] [--force]
   kt install-tools [--dir .] [--force]
   kt update-tools [--dir .] [--force]
   kt config get <key>
@@ -76,7 +76,7 @@ Usage:
 
 Examples:
   kt init java-service my-api
-  kt init multi-service my-app --port 4002
+  kt init multi-service my-app
   make build
   make package`
 	banner = strings.ReplaceAll(banner, "${CYAN}", tui.Cyan+tui.Bold)
@@ -86,7 +86,7 @@ Examples:
 
 func cmdInit(s scaffold.Scaffolder, args []string) {
 	var positional []string
-	dir, port, user, group, author := ".", "", "", "", ""
+	dir := "."
 	force := false
 	for i := 0; i < len(args); i++ {
 		a := args[i]
@@ -95,26 +95,6 @@ func cmdInit(s scaffold.Scaffolder, args []string) {
 			i++
 			if i < len(args) {
 				dir = args[i]
-			}
-		case "--port":
-			i++
-			if i < len(args) {
-				port = args[i]
-			}
-		case "--user":
-			i++
-			if i < len(args) {
-				user = args[i]
-			}
-		case "--group":
-			i++
-			if i < len(args) {
-				group = args[i]
-			}
-		case "--author":
-			i++
-			if i < len(args) {
-				author = args[i]
 			}
 		case "--force":
 			force = true
@@ -130,7 +110,7 @@ func cmdInit(s scaffold.Scaffolder, args []string) {
 		tmplName, appName = promptInit(s, positional)
 	}
 
-	ctx := scaffold.Context{Template: tmplName, App: appName, Port: port, ServiceUser: user, ServiceGroup: group, Author: author}
+	ctx := scaffold.Context{Template: tmplName, App: appName}
 	tui.Header("Initializing " + ctx.App)
 	if err := s.Init(dir, ctx, force); err != nil {
 		tui.Err(err.Error())

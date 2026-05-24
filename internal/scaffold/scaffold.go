@@ -16,7 +16,6 @@ type Context struct {
 	App          string
 	Template     string
 	Author       string
-	Port         string
 	ServiceUser  string
 	ServiceGroup string
 }
@@ -84,9 +83,6 @@ func (s Scaffolder) Init(dest string, ctx Context, force bool) error {
 	}
 	if ctx.Author == "" {
 		ctx.Author = gitAuthor()
-	}
-	if ctx.Port == "" {
-		ctx.Port = "8080"
 	}
 	if ctx.ServiceUser == "" {
 		ctx.ServiceUser = ctx.App

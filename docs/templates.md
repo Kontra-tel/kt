@@ -18,7 +18,6 @@
 | `{{.App}}` | *(required)* | Application name |
 | `{{.Template}}` | *(required)* | Template name |
 | `{{.Author}}` | git config user.name + email | Package maintainer name |
-| `{{.Port}}` | `8080` | Primary listen port |
 | `{{.ServiceUser}}` | `<app>` | systemd service user |
 | `{{.ServiceGroup}}` | `<user>` | systemd service group |
 
@@ -72,7 +71,7 @@ The `generic-cli` template produces only the packaging skeleton (no systemd unit
 ### Java service
 
 ```bash
-kt init java-service my-api --port 4002 --user myapp --group myapp
+kt init java-service my-api
 cd my-api
 make doctor
 make config-init   # creates deploy/config/app.env from the example
@@ -85,7 +84,7 @@ make install
 Scaffolds a Java backend and a Node.js frontend packaged and deployed as a single unit.
 
 ```bash
-kt init multi-service my-app --port 4002
+kt init multi-service my-app
 cd my-app
 make build
 make install
