@@ -3,7 +3,8 @@
 Tiny scaffolding tool for projects that use Make, nFPM, and systemd.
 
 ```bash
-kt init java-service my-api --port 4002
+kt init                      # interactive — choose a template and name
+kt init java-service my-api  # or explicit
 cd my-api
 make doctor && make build && make install
 ```
@@ -40,6 +41,7 @@ make install
 `kt init` scaffolds a project with:
 
 - A `Makefile` wired to shared `.kt/mk/` includes for building, packaging, versioning, and config
+- A `.kt/project.yaml` that stores the app name and other metadata — read by Make and `kt config`
 - An `nfpm.yaml` for building `.deb` and `.rpm` packages with [nFPM](https://nfpm.goreleaser.com)
 - systemd service units with security hardening (for service templates)
 - `deploy/` scripts for install and removal lifecycle

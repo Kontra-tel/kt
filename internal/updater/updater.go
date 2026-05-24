@@ -77,10 +77,7 @@ func Apply(apiBase string) error {
 		return err
 	}
 	tmpPath := tmp.Name()
-	defer func() {
-		tmp.Close()
-		os.Remove(tmpPath)
-	}()
+	defer os.Remove(tmpPath) // no-op after successful Rename; cleans up on failure
 
 	resp, err := http.Get(downloadURL)
 	if err != nil {

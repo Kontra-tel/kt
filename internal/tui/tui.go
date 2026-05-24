@@ -34,6 +34,9 @@ func Select(label string, options []string) int {
 	for {
 		fmt.Printf("%s→%s ", Cyan, Reset)
 		if !scanner.Scan() {
+			if err := scanner.Err(); err != nil {
+				fmt.Printf("%s✗%s read error: %v\n", Red, Reset, err)
+			}
 			return 0
 		}
 		var n int

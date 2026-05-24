@@ -2,10 +2,11 @@
 
 ## kt init
 
-Scaffold a new project from a template.
+Scaffold a new project from a template. Running without arguments starts an interactive prompt to choose a template and enter an app name.
 
 ```bash
-kt init <template> <app> [options]
+kt init                                              # interactive
+kt init <template> <app> [options]                   # explicit
 ```
 
 | Option | Default | Description |
@@ -44,10 +45,22 @@ Run `kt update-tools` in an existing project after upgrading `kt` to pull in the
 
 ## kt config
 
-Manage config files under `deploy/config/`.
+`kt config` has two responsibilities: reading and writing the project's `.kt/project.yaml`, and managing runtime config files under `deploy/config/`.
+
+### Project config
+
+`.kt/project.yaml` is created by `kt init` and holds the app name and other metadata used by Make and nFPM.
 
 ```bash
-kt config init    # copy *.example files to actual config (no-clobber)
+kt config show              # print all keys and values
+kt config get <key>         # print a single value (used by Makefile: APP := $(shell kt config get app))
+kt config set <key> <value> # update a value in .kt/project.yaml
+```
+
+### Deploy config
+
+```bash
+kt config init    # copy deploy/config/*.example files to actual config (no-clobber)
 kt config check   # exit 1 if any config file derived from an example is missing
 kt config diff    # diff each *.example against its actual counterpart
 ```

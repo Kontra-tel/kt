@@ -150,7 +150,7 @@ func TestInit_ProjectYAML(t *testing.T) {
 // remains in output files.
 func TestInit_TemplateVarsRendered(t *testing.T) {
 	s := newScaffolder()
-	templates := []string{"java-service", "node-service", "go-cli", "generic-service", "generic-cli"}
+	templates := []string{"java-service", "node-service", "go-cli", "generic-service", "generic-cli", "multi-service"}
 	for _, tmpl := range templates {
 		t.Run(tmpl, func(t *testing.T) {
 			dir := t.TempDir()

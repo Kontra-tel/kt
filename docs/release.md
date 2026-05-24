@@ -4,7 +4,7 @@
 
 Releases are triggered manually from Gitea's Actions UI:
 
-```
+```text
 Actions → Release → Run workflow → choose bump type (patch / minor / major)
 ```
 
@@ -74,10 +74,12 @@ internal/assets/
       preremove-systemd.sh
   templates/
     projects/
+      generic-cli/
+      generic-service/
       go-cli/
       java-service/
-      node-service/
       multi-service/
+      node-service/
 ```
 
 The `deploy/` folder at the repository root is only for packaging the `kt` binary itself and is unrelated to the project templates.

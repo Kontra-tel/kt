@@ -12,11 +12,11 @@ package: build ## Build package with nFPM (override: NFPM_PACKAGER=deb|rpm|archl
 
 package-deb: build ## Build .deb package explicitly
 	@mkdir -p dist
-	ARCH=$(NFPM_ARCH) nfpm package -f $(NFPM_CONFIG) -p deb -t dist/
+	APP=$(APP) ARCH=$(NFPM_ARCH) VERSION=$(VERSION) nfpm package -f $(NFPM_CONFIG) -p deb -t dist/
 
 package-rpm: build ## Build .rpm package explicitly
 	@mkdir -p dist
-	ARCH=$(NFPM_ARCH) nfpm package -f $(NFPM_CONFIG) -p rpm -t dist/
+	APP=$(APP) ARCH=$(NFPM_ARCH) VERSION=$(VERSION) nfpm package -f $(NFPM_CONFIG) -p rpm -t dist/
 
 local-install: package ## Install built package on this machine
 	@if [ "$(NFPM_PACKAGER)" = "rpm" ]; then sudo rpm -U $$(ls dist/*.rpm | tail -1); \
