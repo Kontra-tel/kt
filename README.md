@@ -3,8 +3,8 @@
 Tiny scaffolding tool for projects that use Make, nFPM, and systemd.
 
 ```bash
-kt init                      # interactive — choose a template and name
-kt init java-service my-api  # or explicit
+kt init                  # interactive — choose a template and name
+kt init app my-api       # or explicit
 cd my-api
 make doctor && make build && make install
 ```
@@ -53,12 +53,8 @@ It is **not** a deployment framework — it sets up the structure, then normal L
 
 | Template | Description |
 | --- | --- |
-| `generic-service` | Language-agnostic systemd service skeleton |
-| `generic-cli` | Language-agnostic CLI binary skeleton |
-| `go-cli` | Go CLI binary packaged with nFPM |
-| `java-service` | Java systemd service |
-| `node-service` | Node.js systemd service (Nuxt 3) |
-| `multi-service` | Java backend + Node.js frontend as one package |
+| `app` | Language-agnostic application — service, daemon, or CLI |
+| `multi` | Two-service application packaged as a single unit (backend + frontend) |
 
 ```bash
 kt templates   # list all available templates

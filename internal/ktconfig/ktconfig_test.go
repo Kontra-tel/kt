@@ -18,11 +18,11 @@ func setup(t *testing.T, content string) {
 }
 
 func TestGet(t *testing.T) {
-	setup(t, "template: java-service\napp: my-api\nport: 4002\n")
+	setup(t, "template: app\napp: my-api\nuser: svc\n")
 	tests := []struct{ key, want string }{
-		{"template", "java-service"},
+		{"template", "app"},
 		{"app", "my-api"},
-		{"port", "4002"},
+		{"user", "svc"},
 	}
 	for _, tc := range tests {
 		got, err := Get(tc.key)
@@ -110,15 +110,15 @@ func TestSet_Idempotent(t *testing.T) {
 }
 
 func TestAll(t *testing.T) {
-	setup(t, "template: java-service\napp: my-api\nport: 4002\n")
+	setup(t, "template: app\napp: my-api\nuser: svc\n")
 	pairs, err := All()
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := [][2]string{
-		{"template", "java-service"},
+		{"template", "app"},
 		{"app", "my-api"},
-		{"port", "4002"},
+		{"user", "svc"},
 	}
 	if len(pairs) != len(want) {
 		t.Fatalf("got %d pairs, want %d", len(pairs), len(want))

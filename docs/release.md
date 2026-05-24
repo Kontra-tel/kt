@@ -74,12 +74,8 @@ internal/assets/
       preremove-systemd.sh
   templates/
     projects/
-      generic-cli/
-      generic-service/
-      go-cli/
-      java-service/
-      multi-service/
-      node-service/
+      app/
+      multi/
 ```
 
 The `deploy/` folder at the repository root is only for packaging the `kt` binary itself and is unrelated to the project templates.

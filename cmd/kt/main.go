@@ -75,8 +75,8 @@ Usage:
   kt version
 
 Examples:
-  kt init java-service my-api
-  kt init multi-service my-app
+  kt init app my-api
+  kt init multi my-platform
   make build
   make package`
 	banner = strings.ReplaceAll(banner, "${CYAN}", tui.Cyan+tui.Bold)
