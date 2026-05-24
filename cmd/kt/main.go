@@ -19,7 +19,7 @@ var (
 	version    = "dev"
 	commit     = "unknown"
 	date       = "unknown"
-	releaseAPI = "https://git.kontra.tel/api/v1/repos/kontra.tel/kt"
+	releaseAPI = "https://git.kontra.tel/api/v1/repos/kontra.tel/Kt"
 )
 
 func main() {
@@ -71,8 +71,8 @@ Usage:
   kt version
 
 Examples:
-  kt init java-service kontra-api
-  kt init multi-service knetlog --port 4002 --user kontra --group kontra
+  kt init java-service my-api
+  kt init multi-service my-app --port 4002
   make build
   make package`
 	banner = strings.ReplaceAll(banner, "${CYAN}", tui.Cyan+tui.Bold)
@@ -82,7 +82,7 @@ Examples:
 
 func cmdInit(s scaffold.Scaffolder, args []string) {
 	var positional []string
-	dir, port, user, group, author := ".", "8080", "", "", "Kontra"
+	dir, port, user, group, author := ".", "8080", "", "", ""
 	force := false
 	for i := 0; i < len(args); i++ {
 		a := args[i]

@@ -6,7 +6,7 @@ section: utils
 priority: optional
 maintainer: Kontra
 description: Tiny project scaffolding for Make, nFPM, and systemd
-homepage: https://git.kontra.tel/kontra.tel/kt
+homepage: https://git.kontra.tel/kontra.tel/Kt
 license: MIT
 contents:
   - src: kt

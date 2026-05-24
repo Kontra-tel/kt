@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -55,7 +56,7 @@ func (s Scaffolder) Init(dest string, ctx Context, force bool) error {
 		return fmt.Errorf("template is required")
 	}
 	if ctx.Author == "" {
-		ctx.Author = "Kontra"
+		ctx.Author = gitAuthor()
 	}
 	if ctx.Port == "" {
 		ctx.Port = "8080"
@@ -143,6 +144,20 @@ func copyTree(efs embed.FS, srcRoot, dstRoot string, ctx *Context, force bool) e
 		}
 		return os.WriteFile(dst, data, mode)
 	})
+}
+
+func gitAuthor() string {
+	name, _ := exec.Command("git", "config", "user.name").Output()
+	email, _ := exec.Command("git", "config", "user.email").Output()
+	n := strings.TrimSpace(string(name))
+	e := strings.TrimSpace(string(email))
+	if n != "" && e != "" {
+		return n + " <" + e + ">"
+	}
+	if n != "" {
+		return n
+	}
+	return ""
 }
 
 func chmodScripts(root string) error {
