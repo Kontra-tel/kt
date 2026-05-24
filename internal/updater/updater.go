@@ -66,7 +66,7 @@ func Apply(apiBase string) error {
 		return fmt.Errorf("no release asset found for %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
 
-	exe, err := executablePath()
+	exe, err := ExecutablePath()
 	if err != nil {
 		return err
 	}
@@ -102,7 +102,8 @@ func Apply(apiBase string) error {
 	return os.Rename(tmpPath, exe)
 }
 
-func executablePath() (string, error) {
+// ExecutablePath returns the real path of the running binary, resolving symlinks.
+func ExecutablePath() (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
 		return "", err

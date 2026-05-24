@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"git.kontra.tel/kontra.tel/build-tools/internal/assets"
@@ -187,6 +188,22 @@ func cmdUpdate(args []string) {
 		return
 	}
 
+	// If the install location isn't writable, re-exec transparently with sudo.
+	if !checkOnly {
+		if exe, err := updater.ExecutablePath(); err == nil {
+			if !canWriteDir(filepath.Dir(exe)) {
+				cmd := exec.Command("sudo", exe, "update")
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				cmd.Stdin = os.Stdin
+				if err := cmd.Run(); err != nil {
+					os.Exit(1)
+				}
+				return
+			}
+		}
+	}
+
 	tui.Header("Checking for updates")
 	latest, newer, err := updater.Check(releaseAPI, version)
 	if err != nil {
@@ -209,6 +226,16 @@ func cmdUpdate(args []string) {
 		os.Exit(1)
 	}
 	tui.OK("updated to " + latest + " — restart kt to use the new version")
+}
+
+func canWriteDir(dir string) bool {
+	tmp, err := os.CreateTemp(dir, ".kt-write-check-*")
+	if err != nil {
+		return false
+	}
+	tmp.Close()
+	os.Remove(tmp.Name())
+	return true
 }
 
 func cmdVersion() {
