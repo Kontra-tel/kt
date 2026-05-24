@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+id -u {{.ServiceUser}} >/dev/null 2>&1 || useradd --system --home /opt/{{.App}} --shell /usr/sbin/nologin {{.ServiceUser}}
+mkdir -p /etc/{{.App}} /opt/{{.App}}
+if [ ! -f /etc/{{.App}}/app.env ]; then cp /etc/{{.App}}/app.env.example /etc/{{.App}}/app.env; fi
+chown -R {{.ServiceUser}}:{{.ServiceGroup}} /opt/{{.App}}
+systemctl daemon-reload
+systemctl enable {{.App}}-backend {{.App}}-frontend
+systemctl restart {{.App}}-backend {{.App}}-frontend

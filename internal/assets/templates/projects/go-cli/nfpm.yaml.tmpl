@@ -1,0 +1,11 @@
+name: {{.App}}
+arch: amd64
+platform: linux
+version: ${VERSION}
+section: default
+priority: optional
+maintainer: {{.Author}}
+description: {{.App}} CLI
+contents:
+  - src: dist/app/usr/local/bin/{{.App}}
+    dst: /usr/local/bin/{{.App}}

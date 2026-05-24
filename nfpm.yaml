@@ -1,0 +1,21 @@
+name: kt
+arch: amd64
+platform: linux
+version: ${VERSION}
+section: utils
+priority: optional
+maintainer: Kontra
+description: Tiny project scaffolding for Make, nFPM, and systemd
+homepage: https://git.kontra.tel/kontra.tel/build-tools
+license: MIT
+contents:
+  - src: kt
+    dst: /usr/local/bin/kt
+    file_info:
+      mode: 0755
+  - src: deploy/config/app.env.example
+    dst: /etc/kt/app.env.example
+    type: config|noreplace
+scripts:
+  postinstall: deploy/scripts/postinstall.sh
+  preremove: deploy/scripts/preremove.sh

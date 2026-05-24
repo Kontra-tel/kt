@@ -1,0 +1,15 @@
+[Unit]
+Description={{.App}} frontend
+After=network.target {{.App}}-backend.service
+
+[Service]
+User={{.ServiceUser}}
+Group={{.ServiceGroup}}
+WorkingDirectory=/opt/{{.App}}/frontend
+EnvironmentFile=-/etc/{{.App}}/app.env
+ExecStart=/usr/bin/node /opt/{{.App}}/frontend/server/index.mjs
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

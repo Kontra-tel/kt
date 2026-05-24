@@ -1,0 +1,158 @@
+package scaffold
+
+import (
+	"embed"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"text/template"
+)
+
+type Context struct {
+	App          string
+	Template     string
+	Author       string
+	Port         string
+	ServiceUser  string
+	ServiceGroup string
+}
+
+type Scaffolder struct{ FS embed.FS }
+
+func (s Scaffolder) Templates() ([]string, error) {
+	entries, err := fs.ReadDir(s.FS, "templates/projects")
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, e := range entries {
+		if e.IsDir() {
+			out = append(out, e.Name())
+		}
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+func (s Scaffolder) InstallTools(dest string, force bool) error {
+	pairs := []struct{ src, dst string }{{"common/mk", ".kt/mk"}, {"common/scripts", ".kt/scripts"}}
+	for _, p := range pairs {
+		if err := copyTree(s.FS, p.src, filepath.Join(dest, p.dst), nil, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s Scaffolder) Init(dest string, ctx Context, force bool) error {
+	if ctx.App == "" {
+		return fmt.Errorf("app name is required")
+	}
+	if ctx.Template == "" {
+		return fmt.Errorf("template is required")
+	}
+	if ctx.Author == "" {
+		ctx.Author = "Kontra"
+	}
+	if ctx.Port == "" {
+		ctx.Port = "8080"
+	}
+	if ctx.ServiceUser == "" {
+		ctx.ServiceUser = ctx.App
+	}
+	if ctx.ServiceGroup == "" {
+		ctx.ServiceGroup = ctx.ServiceUser
+	}
+	if err := os.MkdirAll(dest, 0755); err != nil {
+		return err
+	}
+	if err := s.InstallTools(dest, force); err != nil {
+		return err
+	}
+	base := "templates/projects/" + ctx.Template
+	if _, err := fs.Stat(s.FS, base); err != nil {
+		return fmt.Errorf("unknown template %q", ctx.Template)
+	}
+	if err := copyTree(s.FS, base, dest, &ctx, force); err != nil {
+		return err
+	}
+	vf := filepath.Join(dest, "version.txt")
+	if _, err := os.Stat(vf); os.IsNotExist(err) {
+		if err := os.WriteFile(vf, []byte("0.1.0\n"), 0644); err != nil {
+			return err
+		}
+	}
+	return chmodScripts(dest)
+}
+
+func copyTree(efs embed.FS, srcRoot, dstRoot string, ctx *Context, force bool) error {
+	return fs.WalkDir(efs, srcRoot, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if path == srcRoot {
+			return nil
+		}
+		rel, _ := filepath.Rel(srcRoot, path)
+		if strings.HasSuffix(rel, "template.yaml") {
+			return nil
+		}
+		dstRel := rel
+		if ctx != nil {
+			dstRel = strings.ReplaceAll(dstRel, "app.service", ctx.App+".service")
+			dstRel = strings.ReplaceAll(dstRel, "backend.service", ctx.App+"-backend.service")
+			dstRel = strings.ReplaceAll(dstRel, "frontend.service", ctx.App+"-frontend.service")
+			dstRel = strings.ReplaceAll(dstRel, "cmd/app", "cmd/"+ctx.App)
+		}
+		if strings.HasSuffix(dstRel, ".tmpl") {
+			dstRel = strings.TrimSuffix(dstRel, ".tmpl")
+		}
+		dst := filepath.Join(dstRoot, dstRel)
+		if d.IsDir() {
+			return os.MkdirAll(dst, 0755)
+		}
+		data, err := efs.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if ctx != nil && strings.HasSuffix(path, ".tmpl") {
+			t, err := template.New(filepath.Base(path)).Parse(string(data))
+			if err != nil {
+				return err
+			}
+			var b strings.Builder
+			if err := t.Execute(&b, ctx); err != nil {
+				return err
+			}
+			data = []byte(b.String())
+		}
+		if !force {
+			if _, err := os.Stat(dst); err == nil {
+				return nil
+			}
+		}
+		if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+			return err
+		}
+		mode := fs.FileMode(0644)
+		if strings.HasSuffix(dst, ".sh") {
+			mode = 0755
+		}
+		return os.WriteFile(dst, data, mode)
+	})
+}
+
+func chmodScripts(root string) error {
+	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		if strings.HasSuffix(path, ".sh") {
+			return os.Chmod(path, 0755)
+		}
+		return nil
+	})
+}

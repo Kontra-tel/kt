@@ -1,0 +1,34 @@
+APP := {{.App}}
+VERSION := $(shell cat version.txt)
+DOCTOR_TOOLS := git make java mvn node npm nfpm systemctl
+
+include .kt/mk/common.mk
+include .kt/mk/version.mk
+include .kt/mk/config.mk
+include .kt/mk/doctor.mk
+include .kt/mk/nfpm.mk
+
+.PHONY: test build install restart logs status
+
+test: ## Run backend and frontend tests
+	cd backend && mvn -B -ntp test
+	cd frontend && npm test
+
+build: ## Build backend and frontend artifacts
+	cd backend && mvn -B -ntp clean package -DskipTests
+	cd frontend && npm ci && npm run build
+	mkdir -p dist/app/backend dist/app/frontend
+	cp backend/target/*.jar dist/app/backend/backend.jar
+	cp -r frontend/.output/* dist/app/frontend/ 2>/dev/null || cp -r frontend/dist/* dist/app/frontend/
+
+install: package ## Install local deb
+	sudo dpkg -i dist/*.deb
+
+restart: ## Restart services
+	sudo systemctl restart {{.App}}-backend {{.App}}-frontend
+
+logs: ## Follow logs
+	journalctl -u {{.App}}-backend -u {{.App}}-frontend -f
+
+status: ## Service status
+	systemctl status {{.App}}-backend {{.App}}-frontend --no-pager -l

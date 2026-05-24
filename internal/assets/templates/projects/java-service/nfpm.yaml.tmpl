@@ -1,0 +1,19 @@
+name: {{.App}}
+arch: amd64
+platform: linux
+version: ${VERSION}
+section: default
+priority: optional
+maintainer: {{.Author}}
+description: {{.App}} Java service
+contents:
+  - src: dist/app/{{.App}}.jar
+    dst: /opt/{{.App}}/{{.App}}.jar
+  - src: deploy/config/app.env.example
+    dst: /etc/{{.App}}/app.env.example
+    type: config|noreplace
+  - src: deploy/systemd/{{.App}}.service
+    dst: /etc/systemd/system/{{.App}}.service
+scripts:
+  postinstall: deploy/scripts/postinstall.sh
+  preremove: deploy/scripts/preremove.sh
