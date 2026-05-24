@@ -10,13 +10,15 @@ import (
 	"git.kontra.tel/kontra.tel/build-tools/internal/assets"
 	"git.kontra.tel/kontra.tel/build-tools/internal/scaffold"
 	"git.kontra.tel/kontra.tel/build-tools/internal/tui"
+	"git.kontra.tel/kontra.tel/build-tools/internal/updater"
 	"git.kontra.tel/kontra.tel/build-tools/internal/versioning"
 )
 
 var (
-	version = "dev"
-	commit  = "unknown"
-	date    = "unknown"
+	version    = "dev"
+	commit     = "unknown"
+	date       = "unknown"
+	releaseAPI = "https://git.kontra.tel/api/v1/repos/kontra.tel/kt"
 )
 
 func main() {
@@ -40,6 +42,8 @@ func main() {
 		cmdRelease(os.Args[2:])
 	case "doctor":
 		cmdDoctor()
+	case "update":
+		cmdUpdate(os.Args[2:])
 	case "version":
 		cmdVersion()
 	case "help", "--help", "-h":
@@ -61,6 +65,7 @@ Usage:
   kt update-tools [--dir .] [--force]
   kt config init|diff|check
   kt release patch|minor|major
+  kt update [--check]
   kt doctor
   kt version
 
@@ -173,6 +178,38 @@ func cmdRelease(args []string) {
 }
 
 func cmdDoctor() { runMake("doctor") }
+
+func cmdUpdate(args []string) {
+	checkOnly := len(args) > 0 && args[0] == "--check"
+
+	if version == "dev" {
+		tui.Warn("skipping update check for dev build")
+		return
+	}
+
+	tui.Header("Checking for updates")
+	latest, newer, err := updater.Check(releaseAPI, version)
+	if err != nil {
+		tui.Err("check failed: " + err.Error())
+		os.Exit(1)
+	}
+	if !newer {
+		tui.OK("already up to date (" + version + ")")
+		return
+	}
+	tui.Info("new version available: " + latest + " (current: " + version + ")")
+
+	if checkOnly {
+		os.Exit(1)
+	}
+
+	tui.Header("Updating")
+	if err := updater.Apply(releaseAPI); err != nil {
+		tui.Err(err.Error())
+		os.Exit(1)
+	}
+	tui.OK("updated to " + latest + " — restart kt to use the new version")
+}
 
 func cmdVersion() {
 	tui.Header("kt")

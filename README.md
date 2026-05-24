@@ -36,6 +36,8 @@ kt config check
 kt release patch
 kt release minor
 kt release major
+kt update
+kt update --check
 kt doctor
 kt version
 ```
@@ -230,6 +232,15 @@ Build binaries locally without the workflow:
 ```bash
 make release   # produces dist/kt-* binaries and SHA256SUMS only, no packages
 ```
+
+## Updating kt
+
+```bash
+kt update          # check for a newer release and apply it
+kt update --check  # check only, exits 1 if a newer version exists
+```
+
+`kt update` downloads the release binary for the current OS and architecture from Gitea and atomically replaces the running executable. Dev builds (`version = "dev"`) skip the check.
 
 ## Updating local tooling
 
