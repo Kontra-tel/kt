@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-const path = ".kt/project.yaml"
+var path = ".kt/project.yaml"
 
 // Get reads a key from .kt/project.yaml.
 func Get(key string) (string, error) {
