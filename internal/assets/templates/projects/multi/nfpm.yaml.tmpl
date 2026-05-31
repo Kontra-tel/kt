@@ -1,7 +1,7 @@
 # nFPM package manifest — https://nfpm.goreleaser.com/configuration/
 #
 # Build packages with:
-#   make package          — build for the native arch (deb + rpm + apk)
+#   make package          — build for the native package manager and arch
 #   make package-deb      — .deb only
 #   make package-rpm      — .rpm only
 #
@@ -25,38 +25,37 @@ contents:
   # Application files — `make build` should populate both dist/app/backend/
   # and dist/app/frontend/ before `make package` is called.
   - src: dist/app
-    dst: /opt/${APP}
+    dst: /usr/lib/{{.App}}
 
   # Additional runtime files (optional) — uncomment to package static assets,
   # SQL migrations, config schemas, or other files your app reads from disk.
   # These are taken directly from the repository, bypassing the build step.
   # - src: resources
-  #   dst: /opt/${APP}/resources
+  #   dst: /usr/lib/{{.App}}/resources
 
   # Backend launch script — edit deploy/bin/{{.App}}-backend to set the command.
   - src: deploy/bin/{{.App}}-backend
-    dst: /usr/bin/${APP}-backend
+    dst: /usr/bin/{{.App}}-backend
     file_info:
       mode: 0755
 
   # Frontend launch script — edit deploy/bin/{{.App}}-frontend to set the command.
   - src: deploy/bin/{{.App}}-frontend
-    dst: /usr/bin/${APP}-frontend
+    dst: /usr/bin/{{.App}}-frontend
     file_info:
       mode: 0755
 
   # Runtime config examples (all formats — .env, .yaml, .ini, etc.)
   - src: deploy/config/*.example
-    dst: /etc/${APP}/
+    dst: /etc/{{.App}}/
     type: config|noreplace
 
   # systemd service units
   - src: deploy/systemd/{{.App}}-backend.service
-    dst: /etc/systemd/system/${APP}-backend.service
+    dst: /usr/lib/systemd/system/{{.App}}-backend.service
   - src: deploy/systemd/{{.App}}-frontend.service
-    dst: /etc/systemd/system/${APP}-frontend.service
+    dst: /usr/lib/systemd/system/{{.App}}-frontend.service
 
 scripts:
   postinstall: deploy/scripts/postinstall.sh
   preremove: deploy/scripts/preremove.sh
-

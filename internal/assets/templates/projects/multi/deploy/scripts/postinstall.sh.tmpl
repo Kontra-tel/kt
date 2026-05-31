@@ -5,11 +5,11 @@ set -euo pipefail
 # ── Create service user ────────────────────────────────────────────────────────
 NOLOGIN=$(command -v nologin 2>/dev/null || echo /usr/sbin/nologin)
 id -u {{.ServiceUser}} >/dev/null 2>&1 \
-  || useradd --system --home /opt/{{.App}} --shell "$NOLOGIN" {{.ServiceUser}}
+  || useradd --system --home /var/lib/{{.App}} --shell "$NOLOGIN" {{.ServiceUser}}
 
 # ── Set up directories ─────────────────────────────────────────────────────────
-mkdir -p /etc/{{.App}} /opt/{{.App}}
-chown -R {{.ServiceUser}}:{{.ServiceGroup}} /opt/{{.App}}
+mkdir -p /etc/{{.App}} /var/lib/{{.App}} /var/log/{{.App}}
+chown -R {{.ServiceUser}}:{{.ServiceGroup}} /var/lib/{{.App}} /var/log/{{.App}}
 
 # ── Initialise config ──────────────────────────────────────────────────────────
 # Copy every *.example file to its actual counterpart without overwriting
@@ -20,7 +20,7 @@ for example in /etc/{{.App}}/*.example; do
   [ -f "$target" ] || cp "$example" "$target"
 done
 
-# ── Start services ─────────────────────────────────────────────────────────────
+# ── Reload systemd ─────────────────────────────────────────────────────────────
+# Enabling and restarting services is intentionally left to the deployment
+# process so upgrades can run health checks and migrations at the right time.
 systemctl daemon-reload
-systemctl enable {{.App}}-backend {{.App}}-frontend
-systemctl restart {{.App}}-backend {{.App}}-frontend

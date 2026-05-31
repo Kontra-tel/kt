@@ -2,6 +2,7 @@ package scaffold_test
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -200,6 +201,158 @@ func TestInit_TemplateVarsRendered(t *testing.T) {
 	}
 }
 
+// TestInit_FHSLayout checks that generated service templates use separate
+// locations for packaged artifacts, mutable data, logs, and packaged units.
+func TestInit_FHSLayout(t *testing.T) {
+	s := newScaffolder()
+	tests := []struct {
+		tmpl  string
+		wants map[string][]string
+	}{
+		{
+			tmpl: "app",
+			wants: map[string][]string{
+				"nfpm.yaml": {
+					"dst: /usr/lib/testapp",
+					"dst: /usr/lib/systemd/system/testapp.service",
+				},
+				"deploy/systemd/testapp.service": {
+					"WorkingDirectory=/var/lib/testapp",
+					"ReadWritePaths=/var/lib/testapp /var/log/testapp",
+				},
+				"deploy/scripts/postinstall.sh": {
+					"--home /var/lib/testapp",
+					"/var/lib/testapp /var/log/testapp",
+				},
+			},
+		},
+		{
+			tmpl: "multi",
+			wants: map[string][]string{
+				"nfpm.yaml": {
+					"dst: /usr/lib/testapp",
+					"dst: /usr/lib/systemd/system/testapp-backend.service",
+					"dst: /usr/lib/systemd/system/testapp-frontend.service",
+				},
+				"deploy/systemd/testapp-backend.service": {
+					"WorkingDirectory=/var/lib/testapp",
+					"ReadWritePaths=/var/lib/testapp /var/log/testapp",
+				},
+				"deploy/systemd/testapp-frontend.service": {
+					"WorkingDirectory=/var/lib/testapp",
+					"ReadWritePaths=/var/lib/testapp /var/log/testapp",
+				},
+				"deploy/scripts/postinstall.sh": {
+					"--home /var/lib/testapp",
+					"/var/lib/testapp /var/log/testapp",
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.tmpl, func(t *testing.T) {
+			dir := t.TempDir()
+			ctx := scaffold.Context{Template: tc.tmpl, App: "testapp", ServiceUser: "svc", ServiceGroup: "svc"}
+			if err := s.Init(dir, ctx, false); err != nil {
+				t.Fatal(err)
+			}
+			for rel, wants := range tc.wants {
+				data, err := os.ReadFile(filepath.Join(dir, rel))
+				if err != nil {
+					t.Fatal(err)
+				}
+				content := string(data)
+				for _, want := range wants {
+					if !strings.Contains(content, want) {
+						t.Errorf("%s missing %q:\n%s", rel, want, content)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestInit_NoLegacyOptPaths checks that newly scaffolded projects no longer
+// install application files or writable state below /opt.
+func TestInit_NoLegacyOptPaths(t *testing.T) {
+	s := newScaffolder()
+	for _, tmpl := range []string{"app", "multi"} {
+		t.Run(tmpl, func(t *testing.T) {
+			dir := t.TempDir()
+			ctx := scaffold.Context{Template: tmpl, App: "testapp", ServiceUser: "svc", ServiceGroup: "svc"}
+			if err := s.Init(dir, ctx, false); err != nil {
+				t.Fatal(err)
+			}
+			assertTreeExcludes(t, dir, "/opt/")
+		})
+	}
+}
+
+// TestInit_HooksAreShellValid checks the generated lifecycle hooks with bash.
+func TestInit_HooksAreShellValid(t *testing.T) {
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash not found")
+	}
+	s := newScaffolder()
+	for _, tmpl := range []string{"app", "multi"} {
+		t.Run(tmpl, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := s.Init(dir, scaffold.Context{Template: tmpl, App: "testapp"}, false); err != nil {
+				t.Fatal(err)
+			}
+			for _, rel := range []string{
+				"deploy/scripts/postinstall.sh",
+				"deploy/scripts/preremove.sh",
+				".kt/scripts/postinstall-systemd.sh",
+				".kt/scripts/preremove-systemd.sh",
+			} {
+				cmd := exec.Command(bash, "-n", filepath.Join(dir, rel))
+				if out, err := cmd.CombinedOutput(); err != nil {
+					t.Errorf("%s is not valid bash: %v\n%s", rel, err, out)
+				}
+			}
+		})
+	}
+}
+
+// TestInit_HooksLeaveLifecycleToDeployment checks that package hooks do not
+// enable, restart, stop, or disable services during install or upgrade.
+func TestInit_HooksLeaveLifecycleToDeployment(t *testing.T) {
+	s := newScaffolder()
+	for _, tmpl := range []string{"app", "multi"} {
+		t.Run(tmpl, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := s.Init(dir, scaffold.Context{Template: tmpl, App: "testapp"}, false); err != nil {
+				t.Fatal(err)
+			}
+			for _, rel := range []string{
+				"deploy/scripts/postinstall.sh",
+				"deploy/scripts/preremove.sh",
+				".kt/scripts/postinstall-systemd.sh",
+				".kt/scripts/preremove-systemd.sh",
+			} {
+				data, err := os.ReadFile(filepath.Join(dir, rel))
+				if err != nil {
+					t.Fatal(err)
+				}
+				content := string(data)
+				for _, command := range []string{
+					"systemctl enable",
+					"systemctl restart",
+					"systemctl stop",
+					"systemctl disable",
+				} {
+					if strings.Contains(content, command) {
+						t.Errorf("%s contains lifecycle command %q", rel, command)
+					}
+				}
+			}
+		})
+	}
+}
+
 // TestInit_ServiceFileRename checks that service units and launch scripts are
 // renamed correctly for all templates.
 func TestInit_ServiceFileRename(t *testing.T) {
@@ -273,5 +426,25 @@ func mustExist(t *testing.T, base string, paths ...string) {
 		if _, err := os.Stat(full); err != nil {
 			t.Errorf("expected file not found: %s", p)
 		}
+	}
+}
+
+func assertTreeExcludes(t *testing.T, root, unwanted string) {
+	t.Helper()
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if strings.Contains(string(data), unwanted) {
+			t.Errorf("%s contains %q", path, unwanted)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }

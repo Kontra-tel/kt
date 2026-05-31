@@ -1,0 +1,46 @@
+name: publish-deb
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Verify runner tools
+        run: |
+          command -v nfpm
+          command -v curl
+          make doctor
+
+      - name: Test
+        run: make test
+
+      - name: Build Debian package
+        env:
+          VERSION: ${{ gitea.ref_name }}
+        run: |
+          VERSION="${VERSION#v}"
+          export VERSION
+          make package-deb
+
+      - name: Publish Debian package
+        env:
+          PACKAGE_BASE_URL: ${{ vars.PACKAGE_BASE_URL }}
+          PACKAGE_OWNER: ${{ vars.PACKAGE_OWNER }}
+          PACKAGE_DISTRIBUTION: ${{ vars.PACKAGE_DISTRIBUTION }}
+          PACKAGE_COMPONENT: ${{ vars.PACKAGE_COMPONENT }}
+          PACKAGE_USER: ${{ vars.PACKAGE_USER }}
+          PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
+        run: |
+          for package in dist/*.deb; do
+            curl --fail-with-body \
+              --user "${PACKAGE_USER}:${PACKAGE_TOKEN}" \
+              --upload-file "${package}" \
+              "${PACKAGE_BASE_URL}/api/packages/${PACKAGE_OWNER}/debian/pool/${PACKAGE_DISTRIBUTION}/${PACKAGE_COMPONENT}/upload"
+          done

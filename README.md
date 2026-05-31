@@ -42,7 +42,7 @@ make install
 
 - A `Makefile` wired to shared `.kt/mk/` includes for building, packaging, versioning, and config
 - A `.kt/project.yaml` that stores the app name and other metadata — read by Make and `kt config`
-- An `nfpm.yaml` for building `.deb` and `.rpm` packages with [nFPM](https://nfpm.goreleaser.com)
+- An `nfpm.yaml` for building `.deb`, `.rpm`, and Arch Linux packages with [nFPM](https://nfpm.goreleaser.com)
 - systemd service units with security hardening (for service templates)
 - `deploy/` scripts for install and removal lifecycle
 - A `.gitignore` and `version.txt`
@@ -72,4 +72,6 @@ kt update --check # check only, exits 1 if an update is available
 - [Commands](docs/commands.md)
 - [Templates](docs/templates.md)
 - [Packaging](docs/packaging.md)
+- [Gitea Debian publishing](docs/gitea-debian.md)
+- [Filesystem layout migration](docs/migration-fhs.md)
 - [Release & maintenance](docs/release.md)

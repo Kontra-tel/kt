@@ -1,7 +1,7 @@
 # nFPM package manifest — https://nfpm.goreleaser.com/configuration/
 #
 # Build packages with:
-#   make package          — build for the native arch (deb + rpm + apk)
+#   make package          — build for the native package manager and arch
 #   make package-deb      — .deb only
 #   make package-rpm      — .rpm only
 #
@@ -25,36 +25,35 @@ contents:
   # Application files — adjust src to match your build output.
   # `make build` should populate dist/app/ before `make package` is called.
   - src: dist/app
-    dst: /opt/${APP}
+    dst: /usr/lib/{{.App}}
 
   # Additional runtime files (optional) — uncomment to package static assets,
   # SQL migrations, config schemas, or other files your app reads from disk.
   # These are taken directly from the repository, bypassing the build step.
   # - src: resources
-  #   dst: /opt/${APP}/resources
+  #   dst: /usr/lib/{{.App}}/resources
 
   # Launch script — installed to /usr/bin so the app is on PATH.
   # Edit deploy/bin/{{.App}} to invoke your binary or interpreter.
   # Remove this block if the package installs no runnable entry point.
   - src: deploy/bin/{{.App}}
-    dst: /usr/bin/${APP}
+    dst: /usr/bin/{{.App}}
     file_info:
       mode: 0755
 
   # Runtime config examples — all *.example files are packaged and copied
   # to actual config by postinstall.sh. Non-example files are gitignored.
   - src: deploy/config/*.example
-    dst: /etc/${APP}/
+    dst: /etc/{{.App}}/
     type: config|noreplace
 
   # systemd service unit.
   # Remove this block and the scripts section below for CLI-only packages.
   - src: deploy/systemd/{{.App}}.service
-    dst: /etc/systemd/system/${APP}.service
+    dst: /usr/lib/systemd/system/{{.App}}.service
 
 # Install and removal hooks.
 # Remove both lines if this package has no daemon component.
 scripts:
   postinstall: deploy/scripts/postinstall.sh
   preremove: deploy/scripts/preremove.sh
-

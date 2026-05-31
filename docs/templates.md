@@ -24,10 +24,21 @@ The `deploy/` directory controls what nFPM installs and where. Remove any sub-di
 | Directory | Installed to | Purpose |
 | --- | --- | --- |
 | `deploy/bin/<app>` | `/usr/bin/<app>` | Launch script — invoked by systemd and directly from the shell |
-| `deploy/systemd/<app>.service` | `/etc/systemd/system/` | systemd service unit |
+| `dist/app/` | `/usr/lib/<app>/` | Application artifacts |
+| `deploy/systemd/<app>.service` | `/usr/lib/systemd/system/` | Packaged systemd service unit |
 | `deploy/config/*.example` | `/etc/<app>/` | Runtime config examples (all formats) |
-| `deploy/scripts/postinstall.sh` | nFPM hook | Creates service user, copies config, starts service |
-| `deploy/scripts/preremove.sh` | nFPM hook | Stops and disables service before removal |
+| `deploy/scripts/postinstall.sh` | nFPM hook | Creates the service user and writable directories, copies config, and reloads systemd |
+| `deploy/scripts/preremove.sh` | nFPM hook | Project-specific removal hook placeholder |
+
+Service templates also create writable runtime directories:
+
+```text
+/var/lib/<app>/    mutable service data and working directory
+/var/log/<app>/    service logs when not using the journal
+```
+
+Package files belong under `/usr/lib/<app>/`. Administrator-managed unit
+overrides belong under `/etc/systemd/system/`, not in the package.
 
 ### CLI-only apps
 
@@ -99,10 +110,10 @@ It is the single point of invocation for both systemd and manual use:
 
 ```sh
 # Edit this line to match your runtime:
-exec /opt/myapp/myapp "$@"                                        # native binary
-exec java ${JAVA_OPTS:--Xmx512m} -jar /opt/myapp/myapp.jar "$@"  # Java
-exec /usr/bin/node /opt/myapp/server/index.mjs "$@"               # Node (Nuxt 3)
-exec /usr/bin/python3 /opt/myapp/main.py "$@"                     # Python
+exec /usr/lib/myapp/myapp "$@"                                        # native binary
+exec java ${JAVA_OPTS:--Xmx512m} -jar /usr/lib/myapp/myapp.jar "$@"  # Java
+exec /usr/bin/node /usr/lib/myapp/server/index.mjs "$@"               # Node (Nuxt 3)
+exec /usr/bin/python3 /usr/lib/myapp/main.py "$@"                     # Python
 ```
 
 The systemd unit simply does `ExecStart=/usr/bin/<app>` — interpreter-specific
@@ -158,7 +169,7 @@ deploy/config/app.properties.example  # Java-style properties
 
 Rules:
 
-- All `*.example` files are **tracked in git** and packaged into the `.deb`/`.rpm` under `/etc/<app>/`.
+- All `*.example` files are **tracked in git** and packaged under `/etc/<app>/`.
 - All non-`.example` files in `deploy/config/` are **gitignored** (actual runtime config).
 - `make config-init` copies every `*.example` → the same name without `.example`, without overwriting existing files.
 - `postinstall.sh` does the same on the target machine after package install.
@@ -173,10 +184,25 @@ All generated service units include:
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ReadWritePaths=/opt/<app>
+ReadWritePaths=/var/lib/<app> /var/log/<app>
 ```
 
-Adjust `ReadWritePaths` if the service writes data outside `/opt/<app>`.
+Adjust `ReadWritePaths` if the service writes data elsewhere.
+
+## Service activation
+
+Generated package hooks reload systemd but do not automatically enable,
+restart, stop, or disable services. Package managers may run hooks during both
+installation and upgrade, while applications may need migration and health
+check steps before a restart.
+
+Handle activation in your deployment process:
+
+```bash
+sudo systemctl enable --now <app>
+sudo systemctl restart <app>
+sudo systemctl status <app>
+```
 
 ## Adding a new template
 

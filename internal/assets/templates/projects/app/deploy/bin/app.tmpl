@@ -6,11 +6,11 @@
 #
 # Edit the exec line below to match your runtime. Examples:
 #
-#   Native binary:  exec /opt/{{.App}}/{{.App}} "$@"
-#   Java JAR:       exec java ${JAVA_OPTS:--Xmx512m} -jar /opt/{{.App}}/{{.App}}.jar "$@"
-#   Node (Nuxt 3):  exec /usr/bin/node /opt/{{.App}}/server/index.mjs "$@"
-#   Node (Express): exec /usr/bin/node /opt/{{.App}}/index.js "$@"
-#   Python:         exec /usr/bin/python3 /opt/{{.App}}/main.py "$@"
+#   Native binary:  exec /usr/lib/{{.App}}/{{.App}} "$@"
+#   Java JAR:       exec java ${JAVA_OPTS:--Xmx512m} -jar /usr/lib/{{.App}}/{{.App}}.jar "$@"
+#   Node (Nuxt 3):  exec /usr/bin/node /usr/lib/{{.App}}/server/index.mjs "$@"
+#   Node (Express): exec /usr/bin/node /usr/lib/{{.App}}/index.js "$@"
+#   Python:         exec /usr/bin/python3 /usr/lib/{{.App}}/main.py "$@"
 # ──────────────────────────────────────────────────────────────────────────────
 
-exec /opt/{{.App}}/{{.App}} "$@"
+exec /usr/lib/{{.App}}/{{.App}} "$@"

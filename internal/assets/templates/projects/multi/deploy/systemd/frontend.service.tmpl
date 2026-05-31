@@ -6,7 +6,7 @@ After=network.target {{.App}}-backend.service
 [Service]
 User={{.ServiceUser}}
 Group={{.ServiceGroup}}
-WorkingDirectory=/opt/{{.App}}/frontend
+WorkingDirectory=/var/lib/{{.App}}
 
 # Load KEY=VALUE runtime config. The leading '-' allows missing files.
 EnvironmentFile=-/etc/{{.App}}/app.env
@@ -21,7 +21,7 @@ RestartSec=5
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ReadWritePaths=/opt/{{.App}}
+ReadWritePaths=/var/lib/{{.App}} /var/log/{{.App}}
 
 [Install]
 WantedBy=multi-user.target

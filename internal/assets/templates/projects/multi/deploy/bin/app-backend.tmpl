@@ -6,9 +6,9 @@
 #
 # Edit the exec line below to match your backend runtime. Examples:
 #
-#   Java JAR:   exec java ${JAVA_OPTS:--Xmx512m} -jar /opt/{{.App}}/backend/backend.jar "$@"
-#   Go binary:  exec /opt/{{.App}}/backend/{{.App}}-backend "$@"
-#   Python:     exec /usr/bin/python3 /opt/{{.App}}/backend/main.py "$@"
+#   Java JAR:   exec java ${JAVA_OPTS:--Xmx512m} -jar /usr/lib/{{.App}}/backend/backend.jar "$@"
+#   Go binary:  exec /usr/lib/{{.App}}/backend/{{.App}}-backend "$@"
+#   Python:     exec /usr/bin/python3 /usr/lib/{{.App}}/backend/main.py "$@"
 # ──────────────────────────────────────────────────────────────────────────────
 
-exec /opt/{{.App}}/backend/{{.App}}-backend "$@"
+exec /usr/lib/{{.App}}/backend/{{.App}}-backend "$@"

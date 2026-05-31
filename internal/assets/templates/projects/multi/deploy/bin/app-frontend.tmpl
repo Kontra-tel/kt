@@ -6,9 +6,9 @@
 #
 # Edit the exec line below to match your frontend runtime. Examples:
 #
-#   Node (Nuxt 3):  exec /usr/bin/node /opt/{{.App}}/frontend/server/index.mjs "$@"
-#   Node (Express): exec /usr/bin/node /opt/{{.App}}/frontend/index.js "$@"
-#   Go binary:      exec /opt/{{.App}}/frontend/{{.App}}-frontend "$@"
+#   Node (Nuxt 3):  exec /usr/bin/node /usr/lib/{{.App}}/frontend/server/index.mjs "$@"
+#   Node (Express): exec /usr/bin/node /usr/lib/{{.App}}/frontend/index.js "$@"
+#   Go binary:      exec /usr/lib/{{.App}}/frontend/{{.App}}-frontend "$@"
 # ──────────────────────────────────────────────────────────────────────────────
 
-exec /usr/bin/node /opt/{{.App}}/frontend/server/index.mjs "$@"
+exec /usr/bin/node /usr/lib/{{.App}}/frontend/server/index.mjs "$@"

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-for service in "$@"; do
-  systemctl stop "$service" || true
-  systemctl disable "$service" || true
-done
-systemctl daemon-reload
+
+# Package managers invoke removal hooks during upgrades as well as removals.
+# Leave service stop, disable, and restart policy to the deployment process.
+true

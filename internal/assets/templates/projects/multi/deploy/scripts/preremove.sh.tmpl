@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# preremove.sh — runs before the package is removed from the target machine.
+# preremove.sh — runs before the package is removed or upgraded.
 set -euo pipefail
 
-systemctl stop {{.App}}-backend {{.App}}-frontend || true
-systemctl disable {{.App}}-backend {{.App}}-frontend || true
-systemctl daemon-reload
+# Package managers invoke removal hooks during upgrades as well as removals.
+# Leave service stop, disable, and restart policy to the deployment process.
+true
