@@ -9,11 +9,14 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"git.kontra.tel/kontra.tel/build-tools/internal/versioning"
 )
 
 type Release struct {
-	TagName string  `json:"tag_name"`
-	Assets  []Asset `json:"assets"`
+	TagName    string  `json:"tag_name"`
+	Prerelease bool    `json:"prerelease"`
+	Assets     []Asset `json:"assets"`
 }
 
 type Asset struct {
@@ -21,35 +24,77 @@ type Asset struct {
 	BrowserDownloadURL string `json:"browser_download_url"`
 }
 
-// LatestRelease fetches the latest release from the Gitea API.
+// LatestRelease fetches the latest stable release from the Gitea API.
 func LatestRelease(apiBase string) (Release, error) {
-	resp, err := http.Get(apiBase + "/releases/latest")
+	return SelectRelease(apiBase, false)
+}
+
+func ListReleases(apiBase string) ([]Release, error) {
+	resp, err := http.Get(apiBase + "/releases")
 	if err != nil {
-		return Release{}, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return Release{}, fmt.Errorf("API returned %s", resp.Status)
+		return nil, fmt.Errorf("API returned %s", resp.Status)
 	}
-	var r Release
-	return r, json.NewDecoder(resp.Body).Decode(&r)
+	var releases []Release
+	return releases, json.NewDecoder(resp.Body).Decode(&releases)
+}
+
+func SelectRelease(apiBase string, includePrerelease bool) (Release, error) {
+	releases, err := ListReleases(apiBase)
+	if err != nil {
+		return Release{}, err
+	}
+	var chosen Release
+	var chosenVersion versioning.Version
+	found := false
+	for _, r := range releases {
+		if r.Prerelease && !includePrerelease {
+			continue
+		}
+		v, err := versioning.Parse(strings.TrimPrefix(r.TagName, "v"))
+		if err != nil {
+			continue
+		}
+		if !found || v.Compare(chosenVersion) > 0 {
+			chosen = r
+			chosenVersion = v
+			found = true
+		}
+	}
+	if !found {
+		if includePrerelease {
+			return Release{}, fmt.Errorf("no releases found")
+		}
+		return Release{}, fmt.Errorf("no stable releases found")
+	}
+	return chosen, nil
 }
 
 // Check returns the latest version and whether it is newer than current.
-// Returns (latest, false, nil) when already up to date.
-func Check(apiBase, current string) (string, bool, error) {
-	r, err := LatestRelease(apiBase)
+func Check(apiBase, current string, includePrerelease bool) (string, bool, error) {
+	r, err := SelectRelease(apiBase, includePrerelease)
 	if err != nil {
 		return "", false, err
 	}
 	latest := strings.TrimPrefix(r.TagName, "v")
-	return latest, latest != "" && latest != current, nil
+	cur, err := versioning.Parse(current)
+	if err != nil {
+		return "", false, err
+	}
+	lat, err := versioning.Parse(latest)
+	if err != nil {
+		return "", false, err
+	}
+	return latest, lat.Compare(cur) > 0, nil
 }
 
-// Apply downloads the latest release binary for the current OS/arch and
+// Apply downloads the selected release binary for the current OS/arch and
 // atomically replaces the running executable.
-func Apply(apiBase string) error {
-	r, err := LatestRelease(apiBase)
+func Apply(apiBase string, includePrerelease bool) error {
+	r, err := SelectRelease(apiBase, includePrerelease)
 	if err != nil {
 		return err
 	}
@@ -71,13 +116,12 @@ func Apply(apiBase string) error {
 		return err
 	}
 
-	// Download to a temp file in the same directory so os.Rename is atomic.
 	tmp, err := os.CreateTemp(filepath.Dir(exe), "kt-update-*")
 	if err != nil {
 		return err
 	}
 	tmpPath := tmp.Name()
-	defer os.Remove(tmpPath) // no-op after successful Rename; cleans up on failure
+	defer os.Remove(tmpPath)
 
 	resp, err := http.Get(downloadURL)
 	if err != nil {

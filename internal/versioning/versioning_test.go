@@ -57,7 +57,7 @@ func TestBump_WritesPersisted(t *testing.T) {
 }
 
 func TestBump_InvalidFormat(t *testing.T) {
-	tests := []string{"notaversion", "1.2", "1.2.3.4", "a.b.c"}
+	tests := []string{"notaversion", "1.2", "1.2.3.4", "a.b.c", "1.2.3-rc", "1.2.3-rc.0"}
 	for _, bad := range tests {
 		f := writeVersion(t, bad)
 		_, err := versioning.Bump(f, "patch")
@@ -79,5 +79,50 @@ func TestBump_MissingFile(t *testing.T) {
 	_, err := versioning.Bump("/nonexistent/version.txt", "patch")
 	if err == nil {
 		t.Fatal("expected error for missing file, got nil")
+	}
+}
+
+func TestSet(t *testing.T) {
+	f := writeVersion(t, "1.0.0")
+	got, err := versioning.Set(f, "2.0.0-rc.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "2.0.0-rc.1" {
+		t.Fatalf("got %q", got)
+	}
+	data, err := os.ReadFile(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(data)) != "2.0.0-rc.1" {
+		t.Fatalf("file = %q", strings.TrimSpace(string(data)))
+	}
+}
+
+func TestParseAndCompare(t *testing.T) {
+	tests := []struct {
+		a, b string
+		want int
+	}{
+		{"1.0.0", "1.0.0", 0},
+		{"1.0.1", "1.0.0", 1},
+		{"2.0.0-rc.1", "2.0.0-beta.2", 1},
+		{"2.0.0", "2.0.0-rc.9", 1},
+		{"2.0.0-rc.2", "2.0.0-rc.10", -1},
+		{"2.1.0-alpha.1", "2.0.9", 1},
+	}
+	for _, tc := range tests {
+		a, err := versioning.Parse(tc.a)
+		if err != nil {
+			t.Fatalf("Parse(%q): %v", tc.a, err)
+		}
+		b, err := versioning.Parse(tc.b)
+		if err != nil {
+			t.Fatalf("Parse(%q): %v", tc.b, err)
+		}
+		if got := a.Compare(b); got != tc.want {
+			t.Fatalf("%s.Compare(%s) = %d, want %d", tc.a, tc.b, got, tc.want)
+		}
 	}
 }

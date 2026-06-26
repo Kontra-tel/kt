@@ -3,8 +3,16 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: 'Release mode'
+        required: true
+        default: bump
+        type: choice
+        options:
+          - bump
+          - set-version
       bump:
-        description: 'Version bump type'
+        description: 'Version bump type for bump mode'
         required: true
         default: patch
         type: choice
@@ -12,6 +20,15 @@ on:
           - patch
           - minor
           - major
+      version:
+        description: 'Exact version for set-version mode, e.g. 2.0.0-rc.1'
+        required: false
+        type: string
+      prerelease:
+        description: 'Mark the created release as a prerelease'
+        required: true
+        default: false
+        type: boolean
 
 jobs:
   release:
@@ -31,12 +48,17 @@ jobs:
       - name: Bump version
         id: ver
         run: |
-          NEW=$(awk -F. -v b="${{ inputs.bump }}" '
-            b=="major" { printf "%d.0.0\n", $1+1 }
-            b=="minor" { printf "%d.%d.0\n", $1, $2+1 }
-            b=="patch" { printf "%d.%d.%d\n", $1, $2, $3+1 }
-          ' version.txt)
-          echo "$NEW" > version.txt
+          if [ "${{ inputs.mode }}" = "set-version" ]; then
+            if [ -z "${{ inputs.version }}" ]; then
+              echo "version input is required for set-version mode" >&2
+              exit 1
+            fi
+            go run ./cmd/kt release set "${{ inputs.version }}"
+            NEW="${{ inputs.version }}"
+          else
+            go run ./cmd/kt release "${{ inputs.bump }}"
+            NEW=$(tr -d '\n' < version.txt)
+          fi
           echo "version=$NEW" >> "$GITHUB_OUTPUT"
 
       - name: Test
@@ -93,6 +115,7 @@ jobs:
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.ver.outputs.version }}
+          PRERELEASE: ${{ inputs.prerelease }}
           API_URL: ${{ github.api_url }}
           REPO: ${{ github.repository }}
         run: |
@@ -102,11 +125,12 @@ jobs:
             -H "Authorization: token ${TOKEN}" \
             -H "Content-Type: application/json" \
             -d "$(python3 -c "
-          import json, sys
+          import json, os, sys
           print(json.dumps({
             'tag_name': 'v${VERSION}',
             'name': 'v${VERSION}',
             'body': open('/tmp/release-notes.txt').read().strip(),
+            'prerelease': os.environ['PRERELEASE'].lower() == 'true',
           }))")" \
             | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
 

@@ -9,27 +9,15 @@ import (
 	"git.kontra.tel/kontra.tel/build-tools/internal/updater"
 )
 
-func releaseServer(t *testing.T, tag string, assets []updater.Asset) *httptest.Server {
+func releaseServer(t *testing.T, releases []updater.Release) *httptest.Server {
 	t.Helper()
-	r := updater.Release{TagName: tag, Assets: assets}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/releases/latest" {
+		if r.URL.Path == "/releases" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(r)
+			json.NewEncoder(w).Encode(releases)
 			return
 		}
 		http.NotFound(w, r)
-	}))
-	_ = r
-	// Re-define handler with the captured release value.
-	srv.Close()
-	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if req.URL.Path == "/releases/latest" {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(updater.Release{TagName: tag, Assets: assets})
-			return
-		}
-		http.NotFound(w, req)
 	}))
 	t.Cleanup(srv.Close)
 	return srv
@@ -39,7 +27,7 @@ func TestLatestRelease(t *testing.T) {
 	assets := []updater.Asset{
 		{Name: "kt-linux-amd64", BrowserDownloadURL: "http://example.com/kt-linux-amd64"},
 	}
-	srv := releaseServer(t, "v2.1.0", assets)
+	srv := releaseServer(t, []updater.Release{{TagName: "v2.1.0", Assets: assets}})
 
 	r, err := updater.LatestRelease(srv.URL)
 	if err != nil {
@@ -66,9 +54,9 @@ func TestLatestRelease_ServerError(t *testing.T) {
 }
 
 func TestCheck_Newer(t *testing.T) {
-	srv := releaseServer(t, "v1.5.0", nil)
+	srv := releaseServer(t, []updater.Release{{TagName: "v1.5.0"}})
 
-	latest, newer, err := updater.Check(srv.URL, "1.0.0")
+	latest, newer, err := updater.Check(srv.URL, "1.0.0", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,9 +69,9 @@ func TestCheck_Newer(t *testing.T) {
 }
 
 func TestCheck_UpToDate(t *testing.T) {
-	srv := releaseServer(t, "v1.0.0", nil)
+	srv := releaseServer(t, []updater.Release{{TagName: "v1.0.0"}})
 
-	_, newer, err := updater.Check(srv.URL, "1.0.0")
+	_, newer, err := updater.Check(srv.URL, "1.0.0", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,9 +81,9 @@ func TestCheck_UpToDate(t *testing.T) {
 }
 
 func TestCheck_StripsvPrefix(t *testing.T) {
-	srv := releaseServer(t, "v2.0.0", nil)
+	srv := releaseServer(t, []updater.Release{{TagName: "v2.0.0"}})
 
-	latest, _, err := updater.Check(srv.URL, "1.0.0")
+	latest, _, err := updater.Check(srv.URL, "1.0.0", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,8 +93,36 @@ func TestCheck_StripsvPrefix(t *testing.T) {
 }
 
 func TestCheck_NetworkError(t *testing.T) {
-	_, _, err := updater.Check("http://127.0.0.1:0", "1.0.0")
+	_, _, err := updater.Check("http://127.0.0.1:0", "1.0.0", false)
 	if err == nil {
 		t.Fatal("expected error for unreachable host, got nil")
+	}
+}
+
+func TestCheck_IgnoresPrereleaseByDefault(t *testing.T) {
+	srv := releaseServer(t, []updater.Release{
+		{TagName: "v2.0.0-rc.1", Prerelease: true},
+		{TagName: "v1.9.9"},
+	})
+	latest, newer, err := updater.Check(srv.URL, "1.9.8", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if latest != "1.9.9" || !newer {
+		t.Fatalf("latest=%q newer=%v", latest, newer)
+	}
+}
+
+func TestCheck_CanSelectPrerelease(t *testing.T) {
+	srv := releaseServer(t, []updater.Release{
+		{TagName: "v2.0.0-rc.1", Prerelease: true},
+		{TagName: "v1.9.9"},
+	})
+	latest, newer, err := updater.Check(srv.URL, "1.9.9", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if latest != "2.0.0-rc.1" || !newer {
+		t.Fatalf("latest=%q newer=%v", latest, newer)
 	}
 }
