@@ -65,7 +65,8 @@ kt update --prerelease
 
 By default, updates only install stable releases. Plain `kt update --check`
 still informs you when a newer prerelease exists. Pass `--prerelease` to opt
-into channels such as `2.0.0-rc.1`.
+into channels such as `2.0.0-rc.1`. `--check` and `--prerelease` are kept as
+separate modes on purpose.
 
 Dev builds (version = `dev`) skip the check.
 

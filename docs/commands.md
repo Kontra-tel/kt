@@ -100,7 +100,8 @@ Automatically re-runs with `sudo` if the install location requires elevated perm
 Has no effect on dev builds.
 By default, `kt update` only installs stable releases. `kt update --check`
 still informs you when a newer prerelease exists. Use `--prerelease` to opt
-into downloading prerelease versions such as `2.0.0-rc.1`.
+into downloading prerelease versions such as `2.0.0-rc.1`. `--check` and
+`--prerelease` are intentionally separate modes.
 
 ## kt doctor
 
