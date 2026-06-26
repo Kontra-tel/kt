@@ -5,10 +5,26 @@
 Releases are triggered manually from Gitea's Actions UI:
 
 ```text
-Actions → Release → Run workflow → choose bump type (patch / minor / major)
+Actions → Release → Run workflow → choose mode, version strategy, and whether the release is marked prerelease
 ```
 
-The workflow (`gitea/workflows/release.yaml`) will:
+The workflow (`gitea/workflows/release.yaml`) supports two release modes:
+
+- `bump`: increment `version.txt` by `patch`, `minor`, or `major`
+- `set-version`: set an exact version such as `2.0.0-rc.1`
+
+Mark prerelease builds with the `prerelease` input when creating release
+candidates, betas, or alphas.
+
+### Example: 2.0.0-rc.1
+
+Use these workflow inputs:
+
+- `mode`: `set-version`
+- `version`: `2.0.0-rc.1`
+- `prerelease`: `true`
+
+The workflow will:
 
 1. Bump `version.txt` by the chosen increment and commit it
 2. Run `go test ./...`
@@ -41,10 +57,15 @@ make release   # produces dist/kt-* binaries and SHA256SUMS (no packages)
 
 ```bash
 kt update          # check for a newer release and apply it
-kt update --check  # check only, exits 1 if a newer version is available
+kt update --check  # check only; also informs you when a newer prerelease exists
+kt update --prerelease
 ```
 
 `kt update` downloads the matching binary for the current OS and architecture from Gitea and atomically replaces the running executable. If the install location requires elevated permissions (e.g. `/usr/local/bin`) it re-runs automatically with `sudo`.
+
+By default, updates only install stable releases. Plain `kt update --check`
+still informs you when a newer prerelease exists. Pass `--prerelease` to opt
+into channels such as `2.0.0-rc.1`.
 
 Dev builds (version = `dev`) skip the check.
 
@@ -75,6 +96,8 @@ internal/assets/
   templates/
     projects/
       app/
+      cli/
+      mixed/
       multi/
 ```
 

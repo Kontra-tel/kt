@@ -60,8 +60,22 @@ units.
 ## Service lifecycle
 
 Generated hooks create writable directories, initialize config without
-overwriting existing files, and reload systemd. They deliberately do not
-enable, restart, stop, or disable services.
+overwriting existing files, and refresh systemd metadata when systemd is
+running. They deliberately do not enable, restart, stop, or disable services.
+
+When an environment needs hook-driven lifecycle actions, add executable local
+extensions under `/etc/<app>/hooks/postinstall.local.sh` and
+`/etc/<app>/hooks/preremove.local.sh`. The generated package hooks invoke them
+when present.
+
+Those local extensions receive:
+
+- `KT_APP`: application / package name
+- `KT_KIND`: `service`, `mixed`, or `multi-service`
+- `KT_SERVICES`: comma-separated service names
+- `KT_SERVICE_USER`: configured service user
+- `KT_SERVICE_GROUP`: configured service group
+- Any maintainer-script arguments from the package manager are passed through unchanged
 
 Use deployment automation to perform upgrade-specific migrations, restart the
 service, verify health, and roll back to a known-good package when necessary.
@@ -69,5 +83,6 @@ service, verify health, and roll back to a known-good package when necessary.
 ## Publishing
 
 Package publishing is separate from scaffolding. Use the registry and package
-format appropriate for your environment. For an opt-in Gitea Debian package
-registry example, see [Gitea Debian publishing](gitea-debian.md).
+format appropriate for your environment. The generated packages stay generic:
+the registry publishes artifacts, while deployment automation decides when to
+install, migrate, start, restart, and roll back services.

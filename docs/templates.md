@@ -4,52 +4,119 @@
 
 | Template | Description |
 | --- | --- |
-| `app` | Language-agnostic application — service, daemon, or CLI |
-| `multi` | Two-service application packaged as a single unit (backend + frontend) |
+| `service` | Single-service application package |
+| `app` | Single-service application package (legacy name; use `service`) |
+| `cli` | Command-line application with no service unit |
+| `mixed` | CLI application package with a companion service |
+| `multi` | Multi-service application package (backend + frontend) |
 
-## Template variables
+## Project contract
 
-| Variable | Default | Description |
+Every scaffold writes `.kt/project.yaml`. `kt`, Make, and nFPM treat it as the
+project contract.
+
+| Key | Meaning |
+| --- | --- |
+| `template` | Template name as chosen by the user |
+| `app` | Package / application name |
+| `kind` | `cli`, `service`, `mixed`, or `multi-service` |
+| `services` | Comma-separated packaged service names, blank for `cli` |
+| `user` | Service user for service-bearing templates |
+| `group` | Service group for service-bearing templates |
+
+Use `kt config show --json` or `kt config shape` to inspect the normalized
+contract from an existing project.
+
+## App shapes
+
+- `cli`: `/usr/bin/<app>` is the runnable command.
+- `service`: `/usr/bin/<app>` prints package metadata, while systemd runs `/usr/lib/<app>/bin/<app>`.
+- `mixed`: `/usr/bin/<app>` is the runnable CLI, while `/usr/bin/<app>-service` prints service metadata and systemd runs `/usr/lib/<app>/bin/<app>-service`.
+- `multi`: `/usr/bin/<app>` prints package metadata, while systemd runs dedicated backend/frontend runners under `/usr/lib/<app>/bin/`.
+
+This split keeps service packages safe to inspect manually while giving the
+service manager a dedicated runtime entrypoint.
+
+## Deploy layout
+
+### `cli`
+
+| Path | Installed to | Purpose |
 | --- | --- | --- |
-| `{{.App}}` | *(required)* | Application name |
-| `{{.Template}}` | *(required)* | Template name |
-| `{{.Author}}` | git config user.name + email | Package maintainer name |
-| `{{.ServiceUser}}` | `<app>` | systemd service user |
-| `{{.ServiceGroup}}` | `<user>` | systemd service group |
-
-## Deploy folder layout
-
-The `deploy/` directory controls what nFPM installs and where. Remove any sub-directory you don't need:
-
-| Directory | Installed to | Purpose |
-| --- | --- | --- |
-| `deploy/bin/<app>` | `/usr/bin/<app>` | Launch script — invoked by systemd and directly from the shell |
+| `deploy/bin/<app>` | `/usr/bin/<app>` | Runnable user command |
+| `deploy/config/*.example` | `/etc/<app>/` | Runtime config examples |
 | `dist/app/` | `/usr/lib/<app>/` | Application artifacts |
-| `deploy/systemd/<app>.service` | `/usr/lib/systemd/system/` | Packaged systemd service unit |
-| `deploy/config/*.example` | `/etc/<app>/` | Runtime config examples (all formats) |
-| `deploy/scripts/postinstall.sh` | nFPM hook | Creates the service user and writable directories, copies config, and reloads systemd |
-| `deploy/scripts/preremove.sh` | nFPM hook | Project-specific removal hook placeholder |
 
-Service templates also create writable runtime directories:
+### `service`
+
+| Path | Installed to | Purpose |
+| --- | --- | --- |
+| `deploy/bin/<app>` | `/usr/bin/<app>` | Metadata command with `--json` support |
+| `deploy/run/<app>` | `/usr/lib/<app>/bin/<app>` | Service runner |
+| `deploy/systemd/<app>.service` | `/usr/lib/systemd/system/` | Packaged service unit |
+| `deploy/config/*.example` | `/etc/<app>/` | Runtime config examples |
+| `deploy/hooks-examples/*.sh` | not packaged | Example local lifecycle hooks |
+| `deploy/scripts/postinstall.sh` | nFPM hook | Host prep + optional local extension |
+| `deploy/scripts/preremove.sh` | nFPM hook | Generic removal hook + optional local extension |
+| `dist/app/` | `/usr/lib/<app>/` | Application artifacts |
+
+### `mixed`
+
+| Path | Installed to | Purpose |
+| --- | --- | --- |
+| `deploy/bin/<app>` | `/usr/bin/<app>` | Runnable CLI command |
+| `deploy/bin/<app>-service` | `/usr/bin/<app>-service` | Service metadata command with `--json` support |
+| `deploy/run/<app>-service` | `/usr/lib/<app>/bin/<app>-service` | Service runner |
+| `deploy/systemd/<app>-service.service` | `/usr/lib/systemd/system/` | Packaged service unit |
+| `deploy/config/*.example` | `/etc/<app>/` | Runtime config examples |
+| `deploy/hooks-examples/*.sh` | not packaged | Example local lifecycle hooks |
+| `deploy/scripts/postinstall.sh` | nFPM hook | Host prep + optional local extension |
+| `deploy/scripts/preremove.sh` | nFPM hook | Generic removal hook + optional local extension |
+| `dist/app/` | `/usr/lib/<app>/` | Application artifacts |
+
+### `multi`
+
+| Path | Installed to | Purpose |
+| --- | --- | --- |
+| `deploy/bin/<app>` | `/usr/bin/<app>` | Metadata command with `--json` support |
+| `deploy/run/<app>-backend` | `/usr/lib/<app>/bin/<app>-backend` | Backend runner |
+| `deploy/run/<app>-frontend` | `/usr/lib/<app>/bin/<app>-frontend` | Frontend runner |
+| `deploy/systemd/<app>-backend.service` | `/usr/lib/systemd/system/` | Backend unit |
+| `deploy/systemd/<app>-frontend.service` | `/usr/lib/systemd/system/` | Frontend unit |
+| `deploy/config/*.example` | `/etc/<app>/` | Runtime config examples |
+| `deploy/hooks-examples/*.sh` | not packaged | Example local lifecycle hooks |
+| `deploy/scripts/postinstall.sh` | nFPM hook | Host prep + optional local extension |
+| `deploy/scripts/preremove.sh` | nFPM hook | Generic removal hook + optional local extension |
+| `dist/app/` | `/usr/lib/<app>/` | Application artifacts |
+
+Service-bearing templates also create:
 
 ```text
 /var/lib/<app>/    mutable service data and working directory
 /var/log/<app>/    service logs when not using the journal
+/etc/<app>/hooks/  deployment-local lifecycle extension directory
 ```
 
-Package files belong under `/usr/lib/<app>/`. Administrator-managed unit
-overrides belong under `/etc/systemd/system/`, not in the package.
+## Hook extensions
 
-### CLI-only apps
+Generated package hooks deliberately do not enable, restart, stop, or disable
+services. If an environment needs that behavior, copy the scaffolded examples
+from `deploy/hooks-examples/` to the target host:
 
-Remove `deploy/systemd/` and `deploy/scripts/`, then delete the corresponding
-blocks from `nfpm.yaml`. The launch script in `deploy/bin/` is still packaged
-to `/usr/bin/<app>` so the binary is on PATH.
+```text
+/etc/<app>/hooks/postinstall.local.sh
+/etc/<app>/hooks/preremove.local.sh
+```
 
-### Service-only apps (no CLI entry point)
+The package hooks invoke them when present and pass these environment variables:
 
-Remove `deploy/bin/` and its nfpm.yaml content block. Update `ExecStart` in
-the service unit to invoke the binary or interpreter directly.
+- `KT_APP`
+- `KT_KIND`
+- `KT_SERVICES`
+- `KT_SERVICE_USER`
+- `KT_SERVICE_GROUP`
+
+Maintainer-script arguments are passed through unchanged.
 
 ## File renames
 
@@ -59,90 +126,47 @@ The following path segments are also renamed at scaffold time:
 | Source pattern | Output |
 | --- | --- |
 | `deploy/bin/app` | `deploy/bin/<app>` |
-| `deploy/bin/app-backend` | `deploy/bin/<app>-backend` |
-| `deploy/bin/app-frontend` | `deploy/bin/<app>-frontend` |
+| `deploy/run/app` | `deploy/run/<app>` |
+| `deploy/run/service` | `deploy/run/<app>-service` |
+| `deploy/run/backend` | `deploy/run/<app>-backend` |
+| `deploy/run/frontend` | `deploy/run/<app>-frontend` |
 | `deploy/systemd/app.service.tmpl` | `deploy/systemd/<app>.service` |
+| `deploy/systemd/service.service.tmpl` | `deploy/systemd/<app>-service.service` |
 | `deploy/systemd/backend.service.tmpl` | `deploy/systemd/<app>-backend.service` |
 | `deploy/systemd/frontend.service.tmpl` | `deploy/systemd/<app>-frontend.service` |
 | `.gitignore.tmpl` | `.gitignore` |
 
-## Scaffolded structure
-
-Every template produces:
-
-```text
-Makefile
-nfpm.yaml
-version.txt
-.gitignore
-.kt/
-  project.yaml
-  mk/
-  scripts/
-deploy/
-  bin/
-    <app>              # launch script — edit to set your runtime command
-  systemd/
-    <app>.service
-  config/
-    app.env.example
-  scripts/
-    postinstall.sh
-    preremove.sh
-```
-
-The `multi` template additionally produces:
-
-```text
-deploy/
-  bin/
-    <app>-backend
-    <app>-frontend
-  systemd/
-    <app>-backend.service
-    <app>-frontend.service
-```
-
-## Launch script
-
-`deploy/bin/<app>` is a thin shell wrapper installed to `/usr/bin/<app>`.
-It is the single point of invocation for both systemd and manual use:
-
-```sh
-# Edit this line to match your runtime:
-exec /usr/lib/myapp/myapp "$@"                                        # native binary
-exec java ${JAVA_OPTS:--Xmx512m} -jar /usr/lib/myapp/myapp.jar "$@"  # Java
-exec /usr/bin/node /usr/lib/myapp/server/index.mjs "$@"               # Node (Nuxt 3)
-exec /usr/bin/python3 /usr/lib/myapp/main.py "$@"                     # Python
-```
-
-The systemd unit simply does `ExecStart=/usr/bin/<app>` — interpreter-specific
-flags belong in the launch script, not the unit file.
-
 ## Examples
 
-### Simple service
+### Single service
 
 ```bash
-kt init app my-api
+kt init service my-api
 cd my-api
-# Edit deploy/bin/my-api — set exec to your binary or interpreter
-# Edit Makefile — add your build command
 make doctor
-make config-init
 make build
+make print-info
 make package
 ```
 
-### CLI tool (no daemon)
+### CLI app
 
 ```bash
-kt init app my-tool
+kt init cli my-tool
 cd my-tool
-# Delete deploy/systemd/ and deploy/scripts/
-# Remove the systemd and scripts sections from nfpm.yaml
-# Edit deploy/bin/my-tool — set exec to your binary
 make build
+make run
+make package
+```
+
+### Mixed CLI + service
+
+```bash
+kt init mixed my-suite
+cd my-suite
+make build
+make run
+make print-info
 make package
 ```
 
@@ -151,64 +175,16 @@ make package
 ```bash
 kt init multi my-platform
 cd my-platform
-# Edit deploy/bin/my-platform-backend and deploy/bin/my-platform-frontend
 make build
+make print-info
 make package
-```
-
-## Config files
-
-Config example files live in `deploy/config/` and are named `<name>.<format>.example`:
-
-```text
-deploy/config/app.env.example         # KEY=VALUE env vars (default)
-deploy/config/app.yaml.example        # YAML
-deploy/config/app.ini.example         # INI
-deploy/config/app.properties.example  # Java-style properties
-```
-
-Rules:
-
-- All `*.example` files are **tracked in git** and packaged under `/etc/<app>/`.
-- All non-`.example` files in `deploy/config/` are **gitignored** (actual runtime config).
-- `make config-init` copies every `*.example` → the same name without `.example`, without overwriting existing files.
-- `postinstall.sh` does the same on the target machine after package install.
-
-The systemd `EnvironmentFile` directive only supports `KEY=VALUE` format. For structured config (YAML/INI/properties), have your application read the file directly and pass its path via an env var in `app.env` or an argument in the launch script.
-
-## systemd hardening
-
-All generated service units include:
-
-```ini
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ReadWritePaths=/var/lib/<app> /var/log/<app>
-```
-
-Adjust `ReadWritePaths` if the service writes data elsewhere.
-
-## Service activation
-
-Generated package hooks reload systemd but do not automatically enable,
-restart, stop, or disable services. Package managers may run hooks during both
-installation and upgrade, while applications may need migration and health
-check steps before a restart.
-
-Handle activation in your deployment process:
-
-```bash
-sudo systemctl enable --now <app>
-sudo systemctl restart <app>
-sudo systemctl status <app>
 ```
 
 ## Adding a new template
 
 1. Create a directory under `internal/assets/templates/projects/<name>/`
-2. Add a `template.yaml` with `name` and `description` fields
-3. Add `.tmpl` files — they have access to all template variables above
+2. Add a `template.yaml` with `name` and `description`
+3. Add `.tmpl` files using the template variables available in the scaffold context
 4. Run `go build ./...` to embed the new template into the binary
 
 `kt init <name> <app>` will pick it up automatically.

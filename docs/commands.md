@@ -15,12 +15,14 @@ kt init <template> <app> [options]                   # explicit
 | `--force` | `false` | Overwrite existing files |
 
 ```bash
-kt init app my-api
+kt init service my-api
+kt init cli my-tool
+kt init mixed my-suite
 kt init multi my-platform
-kt init app my-tool --dir /srv/projects
+kt init cli my-tool --dir /srv/projects
 ```
 
-Service user, group, and package maintainer are derived from the app name and git config automatically. Edit the generated files directly if you need to override them.
+Package maintainer is derived from git config automatically. Service templates also derive service user and group from the app name. Edit the generated files directly if you need to override them.
 
 ## kt templates
 
@@ -47,10 +49,18 @@ Run `kt update-tools` in an existing project after upgrading `kt` to pull in the
 
 ### Project config
 
-`.kt/project.yaml` is created by `kt init` and holds the app name and other metadata used by Make and nFPM.
+`.kt/project.yaml` is created by `kt init` and holds the project contract used by Make, nFPM, and `kt` itself. The key fields are:
+
+- `template`: scaffold template name as chosen by the user
+- `app`: package / application name
+- `kind`: `cli`, `service`, `mixed`, or `multi-service`
+- `services`: comma-separated packaged service names, blank for `cli`
+- `user` / `group`: service account values for service-bearing templates
 
 ```bash
 kt config show              # print all keys and values
+kt config show --json       # print normalized project contract as JSON
+kt config shape             # print kind-aware summary from .kt/project.yaml
 kt config get <key>         # print a single value (used by Makefile: APP := $(shell kt config get app))
 kt config set <key> <value> # update a value in .kt/project.yaml
 ```
@@ -73,6 +83,7 @@ Bump `version.txt` and print the new version.
 kt release patch   # 1.2.3 -> 1.2.4
 kt release minor   # 1.2.3 -> 1.3.0
 kt release major   # 1.2.3 -> 2.0.0
+kt release set 2.0.0-rc.1
 ```
 
 ## kt update
@@ -81,11 +92,15 @@ Update `kt` itself to the latest release.
 
 ```bash
 kt update          # check and apply
-kt update --check  # check only, exits 1 if a newer version is available
+kt update --check  # check only; also informs about newer prereleases
+kt update --prerelease
 ```
 
 Automatically re-runs with `sudo` if the install location requires elevated permissions.
 Has no effect on dev builds.
+By default, `kt update` only installs stable releases. `kt update --check`
+still informs you when a newer prerelease exists. Use `--prerelease` to opt
+into downloading prerelease versions such as `2.0.0-rc.1`.
 
 ## kt doctor
 

@@ -4,7 +4,9 @@ Tiny scaffolding tool for projects that use Make, nFPM, and systemd.
 
 ```bash
 kt init                  # interactive — choose a template and name
-kt init app my-api       # or explicit
+kt init service my-api   # preferred single-service template
+kt init cli my-tool      # command-line app
+kt init mixed my-suite   # CLI + companion service
 cd my-api
 make doctor && make build && make install
 ```
@@ -53,18 +55,34 @@ It is **not** a deployment framework — it sets up the structure, then normal L
 
 | Template | Description |
 | --- | --- |
-| `app` | Language-agnostic application — service, daemon, or CLI |
-| `multi` | Two-service application packaged as a single unit (backend + frontend) |
+| `service` | Single-service application package |
+| `app` | Single-service application package (legacy name; use `service`) |
+| `cli` | Command-line application with no service unit |
+| `mixed` | CLI application package with a companion service |
+| `multi` | Multi-service application package (backend + frontend) |
 
 ```bash
 kt templates   # list all available templates
 ```
 
+## 2.0 changes
+
+`2.0.0` changes the public scaffold model in a few important ways:
+
+- `service` is now the preferred single-service template name
+- `app` still works, but it is now the legacy name for that same scaffold
+- pure service packages no longer use `/usr/bin/<app>` as the systemd runtime entrypoint
+- `.kt/project.yaml` now carries explicit `kind` and `services` fields
+- prerelease updates require `kt update --prerelease`
+
+If you are upgrading an existing project, read [2.0 migration](docs/migration-2.0.md).
+
 ## Self-update
 
 ```bash
 kt update         # update kt to the latest release
-kt update --check # check only, exits 1 if an update is available
+kt update --check # check only, exits 1 if a stable or prerelease update is available
+kt update --prerelease
 ```
 
 ## Documentation
@@ -72,6 +90,6 @@ kt update --check # check only, exits 1 if an update is available
 - [Commands](docs/commands.md)
 - [Templates](docs/templates.md)
 - [Packaging](docs/packaging.md)
-- [Gitea Debian publishing](docs/gitea-debian.md)
+- [2.0 migration](docs/migration-2.0.md)
 - [Filesystem layout migration](docs/migration-fhs.md)
 - [Release & maintenance](docs/release.md)
