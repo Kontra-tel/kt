@@ -321,6 +321,10 @@ func cmdUpdate(args []string) {
 			os.Exit(2)
 		}
 	}
+	if checkOnly && includePrerelease {
+		tui.Err("usage: kt update --check | kt update [--prerelease]")
+		os.Exit(2)
+	}
 
 	if version == "dev" {
 		tui.Warn("skipping update check for dev build")
@@ -331,7 +335,11 @@ func cmdUpdate(args []string) {
 	if !checkOnly {
 		if exe, err := updater.ExecutablePath(); err == nil {
 			if !canWriteDir(filepath.Dir(exe)) {
-				cmd := exec.Command("sudo", exe, "update")
+				sudoArgs := []string{exe, "update"}
+				if includePrerelease {
+					sudoArgs = append(sudoArgs, "--prerelease")
+				}
+				cmd := exec.Command("sudo", sudoArgs...)
 				cmd.Stdout = os.Stdout
 				cmd.Stderr = os.Stderr
 				cmd.Stdin = os.Stdin
@@ -351,9 +359,9 @@ func cmdUpdate(args []string) {
 	}
 	if !newer {
 		tui.OK("already up to date (" + version + ")")
-		if checkOnly && !includePrerelease {
+		if checkOnly {
 			if preLatest, preNewer, preErr := updater.Check(releaseAPI, version, true); preErr == nil && preNewer && preLatest != latest {
-				tui.Info("prerelease available: " + preLatest + " (use kt update --check --prerelease or kt update --prerelease)")
+				tui.Info("prerelease available: " + preLatest + " (use kt update --prerelease)")
 			}
 		}
 		return
@@ -363,7 +371,7 @@ func cmdUpdate(args []string) {
 		tui.Info("channel: prerelease enabled")
 	} else if checkOnly {
 		if preLatest, preNewer, preErr := updater.Check(releaseAPI, version, true); preErr == nil && preNewer && preLatest != latest {
-			tui.Info("new prerelease also available: " + preLatest + " (use kt update --check --prerelease or kt update --prerelease)")
+			tui.Info("new prerelease also available: " + preLatest + " (use kt update --prerelease)")
 		}
 	}
 
