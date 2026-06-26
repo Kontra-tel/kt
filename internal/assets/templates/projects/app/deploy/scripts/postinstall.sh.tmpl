@@ -10,7 +10,7 @@ id -u {{.ServiceUser}} >/dev/null 2>&1 \
   || useradd --system --home /var/lib/{{.App}} --shell "$NOLOGIN" {{.ServiceUser}}
 
 # ── Set up directories ─────────────────────────────────────────────────────────
-mkdir -p /etc/{{.App}} /var/lib/{{.App}} /var/log/{{.App}}
+mkdir -p /etc/{{.App}} /etc/{{.App}}/hooks /var/lib/{{.App}} /var/log/{{.App}}
 chown -R {{.ServiceUser}}:{{.ServiceGroup}} /var/lib/{{.App}} /var/log/{{.App}}
 
 # ── Initialise config ──────────────────────────────────────────────────────────
@@ -23,7 +23,21 @@ for example in /etc/{{.App}}/*.example; do
   [ -f "$target" ] || cp "$example" "$target"
 done
 
-# ── Reload systemd ─────────────────────────────────────────────────────────────
-# Enabling and restarting services is intentionally left to the deployment
-# process so upgrades can run health checks and migrations at the right time.
-systemctl daemon-reload
+# ── Refresh service manager metadata ───────────────────────────────────────────
+# Registration is safe here, but activation is left to the deployment process
+# so upgrades can run migrations and health checks before a restart.
+if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+  systemctl daemon-reload || true
+fi
+
+# ── Optional local lifecycle extension ────────────────────────────────────────
+# Teams that want restart logic can provide an executable hook at:
+#   /etc/{{.App}}/hooks/postinstall.local.sh
+if [ -x /etc/{{.App}}/hooks/postinstall.local.sh ]; then
+  KT_APP="{{.App}}" \
+  KT_KIND="service" \
+  KT_SERVICES="{{.App}}" \
+  KT_SERVICE_USER="{{.ServiceUser}}" \
+  KT_SERVICE_GROUP="{{.ServiceGroup}}" \
+    /etc/{{.App}}/hooks/postinstall.local.sh "$@"
+fi

@@ -1,0 +1,14 @@
+#!/bin/sh
+# Service runner for {{.App}}
+# ──────────────────────────────────────────────────────────────────────────────
+# This script is packaged for the service manager and should not be the default
+# user-facing command. Edit the exec line below to match your runtime.
+#
+#   Native binary:  exec /usr/lib/{{.App}}/{{.App}} "$@"
+#   Java JAR:       exec java ${JAVA_OPTS:--Xmx512m} -jar /usr/lib/{{.App}}/{{.App}}.jar "$@"
+#   Node (Nuxt 3):  exec /usr/bin/node /usr/lib/{{.App}}/server/index.mjs "$@"
+#   Node (Express): exec /usr/bin/node /usr/lib/{{.App}}/index.js "$@"
+#   Python:         exec /usr/bin/python3 /usr/lib/{{.App}}/main.py "$@"
+# ──────────────────────────────────────────────────────────────────────────────
+
+exec /usr/lib/{{.App}}/{{.App}} "$@"

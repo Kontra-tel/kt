@@ -15,24 +15,18 @@ include .kt/mk/nfpm.mk
 
 # ── Project targets ────────────────────────────────────────────────────────────
 
-.PHONY: test build run print-info install
+.PHONY: test build run install
 
 test: ## Run tests
 	@echo "TODO: add your test command"
 
 # Build your application and place output in dist/app/ so nFPM can find it.
-# The service runner deploy/run/$(APP) is packaged for service-manager use.
+# The command shim deploy/bin/$(APP) is packaged to /usr/bin/$(APP).
 build: ## Build application
 	@echo "TODO: add your build command"
 	@mkdir -p dist/app
 
-# Run locally using the service runner.
 run: build ## Run locally
-	@sh deploy/run/$(APP)
-
-print-info: ## Show packaged service metadata
 	@sh deploy/bin/$(APP)
 
 install: local-install ## Install package on this machine
-
-# For command-line applications with no service unit, use `kt init cli <app>`.

@@ -12,8 +12,8 @@ WorkingDirectory=/var/lib/{{.App}}
 # Load KEY=VALUE runtime config. The leading '-' allows missing files.
 EnvironmentFile=-/etc/{{.App}}/app.env
 
-# Edit deploy/bin/{{.App}}-backend to change the launch command.
-ExecStart=/usr/bin/{{.App}}-backend
+# Edit deploy/run/{{.App}}-backend to change the launch command.
+ExecStart=/usr/lib/{{.App}}/bin/{{.App}}-backend
 
 Restart=on-failure
 RestartSec=5

@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Example local preremove hook.
+# Copy this to /etc/{{.App}}/hooks/preremove.local.sh on target hosts only if
+# your deployment process really wants package-triggered stop or drain logic.
+
+if ! command -v systemctl >/dev/null 2>&1 || [ ! -d /run/systemd/system ]; then
+  exit 0
+fi
+
+old_ifs=$IFS
+IFS=','
+set -- $KT_SERVICES
+IFS=$old_ifs
+
+for service in "$@"; do
+  [ -n "$service" ] || continue
+  systemctl stop "$service"
+done

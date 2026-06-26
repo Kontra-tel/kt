@@ -1,0 +1,4 @@
+#!/bin/sh
+# Service runner for {{.App}} companion service
+
+exec /usr/lib/{{.App}}/service/{{.App}}-service "$@"

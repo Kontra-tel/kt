@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Example local postinstall hook.
+# Copy this to /etc/{{.App}}/hooks/postinstall.local.sh on target hosts if you
+# want package-triggered restart behavior. Adapt it to your rollout process.
+
+if ! command -v systemctl >/dev/null 2>&1 || [ ! -d /run/systemd/system ]; then
+  exit 0
+fi
+
+old_ifs=$IFS
+IFS=','
+set -- $KT_SERVICES
+IFS=$old_ifs
+
+for service in "$@"; do
+  [ -n "$service" ] || continue
+  systemctl try-restart "$service" || systemctl start "$service"
+done

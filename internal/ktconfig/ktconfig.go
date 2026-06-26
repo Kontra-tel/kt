@@ -8,6 +8,15 @@ import (
 
 var path = ".kt/project.yaml"
 
+type Project struct {
+	Template string
+	App      string
+	Kind     string
+	Services string
+	User     string
+	Group    string
+}
+
 // Get reads a key from .kt/project.yaml.
 func Get(key string) (string, error) {
 	lines, err := readLines()
@@ -49,7 +58,63 @@ func Set(key, value string) error {
 
 // All returns all key-value pairs from .kt/project.yaml, preserving order.
 func All() ([][2]string, error) {
-	lines, err := readLines()
+	return allFrom(path)
+}
+
+// Load reads and normalizes the project contract from .kt/project.yaml.
+func Load() (Project, error) {
+	return LoadFile(path)
+}
+
+// LoadFile reads and normalizes the project contract from the given file.
+func LoadFile(file string) (Project, error) {
+	pairs, err := allFrom(file)
+	if err != nil {
+		return Project{}, err
+	}
+	var p Project
+	for _, pair := range pairs {
+		switch pair[0] {
+		case "template":
+			p.Template = pair[1]
+		case "app":
+			p.App = pair[1]
+		case "kind":
+			p.Kind = pair[1]
+		case "services":
+			p.Services = pair[1]
+		case "user":
+			p.User = pair[1]
+		case "group":
+			p.Group = pair[1]
+		}
+	}
+	p.normalize()
+	return p, nil
+}
+
+// ServicesList returns the configured service names.
+func (p Project) ServicesList() []string {
+	if strings.TrimSpace(p.Services) == "" {
+		return nil
+	}
+	parts := strings.Split(p.Services, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
+}
+
+func (p Project) HasServices() bool {
+	return len(p.ServicesList()) > 0
+}
+
+func allFrom(file string) ([][2]string, error) {
+	lines, err := readLinesFrom(file)
 	if err != nil {
 		return nil, err
 	}
@@ -67,10 +132,45 @@ func All() ([][2]string, error) {
 }
 
 func readLines() ([]string, error) {
-	data, err := os.ReadFile(path)
+	return readLinesFrom(path)
+}
+
+func readLinesFrom(file string) ([]string, error) {
+	data, err := os.ReadFile(file)
 	if err != nil {
-		return nil, fmt.Errorf("%s not found — run kt init first", path)
+		return nil, fmt.Errorf("%s not found — run kt init first", file)
 	}
 	lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
 	return lines, nil
+}
+
+func (p *Project) normalize() {
+	if p.Kind == "" {
+		switch p.Template {
+		case "app", "service":
+			p.Kind = "service"
+		case "multi":
+			p.Kind = "multi-service"
+		case "mixed":
+			p.Kind = "mixed"
+		case "cli":
+			p.Kind = "cli"
+		}
+	}
+	if strings.TrimSpace(p.Services) == "" {
+		switch p.Kind {
+		case "service":
+			if p.App != "" {
+				p.Services = p.App
+			}
+		case "multi-service":
+			if p.App != "" {
+				p.Services = p.App + "-backend," + p.App + "-frontend"
+			}
+		case "mixed":
+			if p.App != "" {
+				p.Services = p.App + "-service"
+			}
+		}
+	}
 }

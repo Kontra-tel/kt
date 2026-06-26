@@ -33,11 +33,15 @@ contents:
   # - src: resources
   #   dst: /usr/lib/{{.App}}/resources
 
-  # Launch script — installed to /usr/bin so the app is on PATH.
-  # Edit deploy/bin/{{.App}} to invoke your binary or interpreter.
-  # Remove this block if the package installs no runnable entry point.
+  # User-facing metadata command — safe to run manually on service hosts.
   - src: deploy/bin/{{.App}}
     dst: /usr/bin/{{.App}}
+    file_info:
+      mode: 0755
+
+  # Service runner — used by the service manager.
+  - src: deploy/run/{{.App}}
+    dst: /usr/lib/{{.App}}/bin/{{.App}}
     file_info:
       mode: 0755
 
@@ -48,12 +52,9 @@ contents:
     type: config|noreplace
 
   # systemd service unit.
-  # Remove this block and the scripts section below for CLI-only packages.
   - src: deploy/systemd/{{.App}}.service
     dst: /usr/lib/systemd/system/{{.App}}.service
 
-# Install and removal hooks.
-# Remove both lines if this package has no daemon component.
 scripts:
   postinstall: deploy/scripts/postinstall.sh
   preremove: deploy/scripts/preremove.sh

@@ -29,7 +29,7 @@ func TestTemplatesWithDesc(t *testing.T) {
 		byName[ti.Name] = ti.Desc
 	}
 
-	for _, name := range []string{"app", "multi"} {
+	for _, name := range []string{"app", "cli", "mixed", "multi", "service"} {
 		if _, ok := byName[name]; !ok {
 			t.Errorf("template %q not found", name)
 		}
@@ -83,7 +83,7 @@ func TestInit_UnknownTemplate(t *testing.T) {
 }
 
 // TestInit_AppFiles checks that the app template produces the expected files,
-// including the renamed launch script and service unit.
+// including the metadata command, service runner, and service unit.
 func TestInit_AppFiles(t *testing.T) {
 	s := newScaffolder()
 	dir := t.TempDir()
@@ -100,31 +100,77 @@ func TestInit_AppFiles(t *testing.T) {
 		".kt/mk/common.mk",
 		".kt/mk/nfpm.mk",
 		"deploy/bin/my-tool",
+		"deploy/run/my-tool",
 		"deploy/systemd/my-tool.service",
 		"deploy/config/app.env.example",
+		"deploy/hooks-examples/postinstall.local.sh",
+		"deploy/hooks-examples/preremove.local.sh",
 		"deploy/scripts/postinstall.sh",
 		"deploy/scripts/preremove.sh",
 	)
 }
 
-// TestInit_AppBinExecutable checks that the deploy/bin/ launch script is executable.
-func TestInit_AppBinExecutable(t *testing.T) {
+// TestInit_AppScriptsExecutable checks that the app command and runner are executable.
+func TestInit_AppScriptsExecutable(t *testing.T) {
 	s := newScaffolder()
 	dir := t.TempDir()
 	if err := s.Init(dir, scaffold.Context{Template: "app", App: "my-tool"}, false); err != nil {
 		t.Fatal(err)
 	}
-	info, err := os.Stat(filepath.Join(dir, "deploy/bin/my-tool"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if info.Mode()&0111 == 0 {
-		t.Error("deploy/bin/my-tool is not executable")
+	for _, rel := range []string{"deploy/bin/my-tool", "deploy/run/my-tool"} {
+		info, err := os.Stat(filepath.Join(dir, rel))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode()&0111 == 0 {
+			t.Errorf("%s is not executable", rel)
+		}
 	}
 }
 
+// TestInit_CLIFiles checks that the cli template produces the expected files.
+func TestInit_CLIFiles(t *testing.T) {
+	s := newScaffolder()
+	dir := t.TempDir()
+	if err := s.Init(dir, scaffold.Context{Template: "cli", App: "my-tool"}, false); err != nil {
+		t.Fatal(err)
+	}
+
+	mustExist(t, dir,
+		"Makefile",
+		"nfpm.yaml",
+		".kt/project.yaml",
+		"deploy/bin/my-tool",
+		"deploy/config/app.env.example",
+	)
+}
+
+func TestInit_MixedFiles(t *testing.T) {
+	s := newScaffolder()
+	dir := t.TempDir()
+	ctx := scaffold.Context{Template: "mixed", App: "my-suite", ServiceUser: "svc", ServiceGroup: "svc"}
+	if err := s.Init(dir, ctx, false); err != nil {
+		t.Fatal(err)
+	}
+
+	mustExist(t, dir,
+		"Makefile",
+		"nfpm.yaml",
+		".kt/project.yaml",
+		"deploy/bin/my-suite",
+		"deploy/bin/my-suite-service",
+		"deploy/run/my-suite-service",
+		"deploy/systemd/my-suite-service.service",
+		"deploy/config/app.env.example",
+		"deploy/hooks-examples/postinstall.local.sh",
+		"deploy/hooks-examples/preremove.local.sh",
+		"deploy/scripts/postinstall.sh",
+		"deploy/scripts/preremove.sh",
+	)
+}
+
 // TestInit_MultiFiles checks that the multi template produces the expected files,
-// including backend/frontend launch scripts and service units.
+// including the metadata command, service runners, and service units.
 func TestInit_MultiFiles(t *testing.T) {
 	s := newScaffolder()
 	dir := t.TempDir()
@@ -137,11 +183,14 @@ func TestInit_MultiFiles(t *testing.T) {
 		"Makefile",
 		"nfpm.yaml",
 		".kt/project.yaml",
-		"deploy/bin/my-app-backend",
-		"deploy/bin/my-app-frontend",
+		"deploy/bin/my-app",
+		"deploy/run/my-app-backend",
+		"deploy/run/my-app-frontend",
 		"deploy/systemd/my-app-backend.service",
 		"deploy/systemd/my-app-frontend.service",
 		"deploy/config/app.env.example",
+		"deploy/hooks-examples/postinstall.local.sh",
+		"deploy/hooks-examples/preremove.local.sh",
 		"deploy/scripts/postinstall.sh",
 		"deploy/scripts/preremove.sh",
 	)
@@ -162,10 +211,29 @@ func TestInit_ProjectYAML(t *testing.T) {
 	}
 	content := string(data)
 
-	for _, want := range []string{"app: my-api", "user: svc", "group: ops", "template: app"} {
+	for _, want := range []string{"app: my-api", "kind: service", "services: my-api", "user: svc", "group: ops", "template: app"} {
 		if !strings.Contains(content, want) {
 			t.Errorf("project.yaml missing %q:\n%s", want, content)
 		}
+	}
+}
+
+func TestInit_ServiceAliasWritesTemplateName(t *testing.T) {
+	s := newScaffolder()
+	dir := t.TempDir()
+	if err := s.Init(dir, scaffold.Context{Template: "service", App: "my-api"}, false); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, ".kt/project.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "template: service") {
+		t.Fatalf("project.yaml missing service alias template name:\n%s", content)
+	}
+	if !strings.Contains(content, "kind: service") {
+		t.Fatalf("project.yaml missing normalized kind:\n%s", content)
 	}
 }
 
@@ -173,7 +241,7 @@ func TestInit_ProjectYAML(t *testing.T) {
 // remains in output files.
 func TestInit_TemplateVarsRendered(t *testing.T) {
 	s := newScaffolder()
-	templates := []string{"app", "multi"}
+	templates := []string{"app", "cli", "mixed", "multi", "service"}
 	for _, tmpl := range templates {
 		t.Run(tmpl, func(t *testing.T) {
 			dir := t.TempDir()
@@ -202,7 +270,7 @@ func TestInit_TemplateVarsRendered(t *testing.T) {
 }
 
 // TestInit_FHSLayout checks that generated service templates use separate
-// locations for packaged artifacts, mutable data, logs, and packaged units.
+// locations for packaged artifacts, mutable data, logs, packaged units, and runners.
 func TestInit_FHSLayout(t *testing.T) {
 	s := newScaffolder()
 	tests := []struct {
@@ -214,11 +282,13 @@ func TestInit_FHSLayout(t *testing.T) {
 			wants: map[string][]string{
 				"nfpm.yaml": {
 					"dst: /usr/lib/testapp",
+					"dst: /usr/lib/testapp/bin/testapp",
 					"dst: /usr/lib/systemd/system/testapp.service",
 				},
 				"deploy/systemd/testapp.service": {
 					"WorkingDirectory=/var/lib/testapp",
 					"ReadWritePaths=/var/lib/testapp /var/log/testapp",
+					"ExecStart=/usr/lib/testapp/bin/testapp",
 				},
 				"deploy/scripts/postinstall.sh": {
 					"--home /var/lib/testapp",
@@ -231,19 +301,43 @@ func TestInit_FHSLayout(t *testing.T) {
 			wants: map[string][]string{
 				"nfpm.yaml": {
 					"dst: /usr/lib/testapp",
+					"dst: /usr/lib/testapp/bin/testapp-backend",
+					"dst: /usr/lib/testapp/bin/testapp-frontend",
 					"dst: /usr/lib/systemd/system/testapp-backend.service",
 					"dst: /usr/lib/systemd/system/testapp-frontend.service",
 				},
 				"deploy/systemd/testapp-backend.service": {
 					"WorkingDirectory=/var/lib/testapp",
 					"ReadWritePaths=/var/lib/testapp /var/log/testapp",
+					"ExecStart=/usr/lib/testapp/bin/testapp-backend",
 				},
 				"deploy/systemd/testapp-frontend.service": {
 					"WorkingDirectory=/var/lib/testapp",
 					"ReadWritePaths=/var/lib/testapp /var/log/testapp",
+					"ExecStart=/usr/lib/testapp/bin/testapp-frontend",
 				},
 				"deploy/scripts/postinstall.sh": {
 					"--home /var/lib/testapp",
+					"/var/lib/testapp /var/log/testapp",
+				},
+			},
+		},
+		{
+			tmpl: "mixed",
+			wants: map[string][]string{
+				"nfpm.yaml": {
+					"dst: /usr/lib/testapp",
+					"dst: /usr/lib/testapp/bin/testapp-service",
+					"dst: /usr/lib/systemd/system/testapp-service.service",
+				},
+				"deploy/systemd/testapp-service.service": {
+					"WorkingDirectory=/var/lib/testapp",
+					"ReadWritePaths=/var/lib/testapp /var/log/testapp",
+					"ExecStart=/usr/lib/testapp/bin/testapp-service",
+				},
+				"deploy/scripts/postinstall.sh": {
+					"--home /var/lib/testapp",
+					"/etc/testapp/hooks",
 					"/var/lib/testapp /var/log/testapp",
 				},
 			},
@@ -273,11 +367,136 @@ func TestInit_FHSLayout(t *testing.T) {
 	}
 }
 
+// TestInit_CLINoServiceBits checks that the cli template does not scaffold service assets.
+func TestInit_CLINoServiceBits(t *testing.T) {
+	s := newScaffolder()
+	dir := t.TempDir()
+	if err := s.Init(dir, scaffold.Context{Template: "cli", App: "testapp"}, false); err != nil {
+		t.Fatal(err)
+	}
+	for _, rel := range []string{
+		"deploy/systemd",
+		"deploy/scripts",
+		"deploy/run",
+	} {
+		if _, err := os.Stat(filepath.Join(dir, rel)); !os.IsNotExist(err) {
+			t.Errorf("%s should not exist in cli template", rel)
+		}
+	}
+	data, err := os.ReadFile(filepath.Join(dir, ".kt/project.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+	for _, unwanted := range []string{"user:", "group:"} {
+		if strings.Contains(content, unwanted) {
+			t.Errorf("cli project.yaml should not contain %q:\n%s", unwanted, content)
+		}
+	}
+}
+
+func TestInit_MetadataCommandsSupportJSON(t *testing.T) {
+	s := newScaffolder()
+	tests := map[string]string{
+		"app":   "deploy/bin/testapp",
+		"multi": "deploy/bin/testapp",
+		"mixed": "deploy/bin/testapp-service",
+	}
+	for tmpl, rel := range tests {
+		t.Run(tmpl, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := s.Init(dir, scaffold.Context{Template: tmpl, App: "testapp"}, false); err != nil {
+				t.Fatal(err)
+			}
+			data, err := os.ReadFile(filepath.Join(dir, rel))
+			if err != nil {
+				t.Fatal(err)
+			}
+			content := string(data)
+			if !strings.Contains(content, "--json") {
+				t.Fatalf("%s missing --json support:\n%s", rel, content)
+			}
+		})
+	}
+}
+
+func TestInit_TreeShape(t *testing.T) {
+	s := newScaffolder()
+	tests := map[string][]string{
+		"cli": {
+			".gitignore",
+			".kt/project.yaml",
+			"Makefile",
+			"deploy/bin/treeapp",
+			"deploy/config/app.env.example",
+			"nfpm.yaml",
+			"version.txt",
+		},
+		"service": {
+			".gitignore",
+			".kt/project.yaml",
+			"Makefile",
+			"deploy/bin/treeapp",
+			"deploy/config/app.env.example",
+			"deploy/hooks-examples/postinstall.local.sh",
+			"deploy/hooks-examples/preremove.local.sh",
+			"deploy/run/treeapp",
+			"deploy/scripts/postinstall.sh",
+			"deploy/scripts/preremove.sh",
+			"deploy/systemd/treeapp.service",
+			"nfpm.yaml",
+			"version.txt",
+		},
+		"mixed": {
+			".gitignore",
+			".kt/project.yaml",
+			"Makefile",
+			"deploy/bin/treeapp",
+			"deploy/bin/treeapp-service",
+			"deploy/config/app.env.example",
+			"deploy/hooks-examples/postinstall.local.sh",
+			"deploy/hooks-examples/preremove.local.sh",
+			"deploy/run/treeapp-service",
+			"deploy/scripts/postinstall.sh",
+			"deploy/scripts/preremove.sh",
+			"deploy/systemd/treeapp-service.service",
+			"nfpm.yaml",
+			"version.txt",
+		},
+		"multi": {
+			".gitignore",
+			".kt/project.yaml",
+			"Makefile",
+			"deploy/bin/treeapp",
+			"deploy/config/app.env.example",
+			"deploy/hooks-examples/postinstall.local.sh",
+			"deploy/hooks-examples/preremove.local.sh",
+			"deploy/run/treeapp-backend",
+			"deploy/run/treeapp-frontend",
+			"deploy/scripts/postinstall.sh",
+			"deploy/scripts/preremove.sh",
+			"deploy/systemd/treeapp-backend.service",
+			"deploy/systemd/treeapp-frontend.service",
+			"nfpm.yaml",
+			"version.txt",
+		},
+	}
+	for tmpl, wants := range tests {
+		t.Run(tmpl, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := s.Init(dir, scaffold.Context{Template: tmpl, App: "treeapp"}, false); err != nil {
+				t.Fatal(err)
+			}
+			mustExist(t, dir, wants...)
+		})
+	}
+}
+
 // TestInit_NoLegacyOptPaths checks that newly scaffolded projects no longer
 // install application files or writable state below /opt.
 func TestInit_NoLegacyOptPaths(t *testing.T) {
 	s := newScaffolder()
-	for _, tmpl := range []string{"app", "multi"} {
+	for _, tmpl := range []string{"app", "cli", "mixed", "multi", "service"} {
 		t.Run(tmpl, func(t *testing.T) {
 			dir := t.TempDir()
 			ctx := scaffold.Context{Template: tmpl, App: "testapp", ServiceUser: "svc", ServiceGroup: "svc"}
@@ -296,18 +515,46 @@ func TestInit_HooksAreShellValid(t *testing.T) {
 		t.Skip("bash not found")
 	}
 	s := newScaffolder()
-	for _, tmpl := range []string{"app", "multi"} {
+	for _, tmpl := range []string{"app", "cli", "mixed", "multi", "service"} {
 		t.Run(tmpl, func(t *testing.T) {
 			dir := t.TempDir()
 			if err := s.Init(dir, scaffold.Context{Template: tmpl, App: "testapp"}, false); err != nil {
 				t.Fatal(err)
 			}
-			for _, rel := range []string{
-				"deploy/scripts/postinstall.sh",
-				"deploy/scripts/preremove.sh",
+			paths := []string{
+				"deploy/bin/testapp",
 				".kt/scripts/postinstall-systemd.sh",
 				".kt/scripts/preremove-systemd.sh",
-			} {
+			}
+			switch tmpl {
+			case "app", "service":
+				paths = append(paths,
+					"deploy/run/testapp",
+					"deploy/scripts/postinstall.sh",
+					"deploy/scripts/preremove.sh",
+					"deploy/hooks-examples/postinstall.local.sh",
+					"deploy/hooks-examples/preremove.local.sh",
+				)
+			case "mixed":
+				paths = append(paths,
+					"deploy/bin/testapp-service",
+					"deploy/run/testapp-service",
+					"deploy/scripts/postinstall.sh",
+					"deploy/scripts/preremove.sh",
+					"deploy/hooks-examples/postinstall.local.sh",
+					"deploy/hooks-examples/preremove.local.sh",
+				)
+			case "multi":
+				paths = append(paths,
+					"deploy/run/testapp-backend",
+					"deploy/run/testapp-frontend",
+					"deploy/scripts/postinstall.sh",
+					"deploy/scripts/preremove.sh",
+					"deploy/hooks-examples/postinstall.local.sh",
+					"deploy/hooks-examples/preremove.local.sh",
+				)
+			}
+			for _, rel := range paths {
 				cmd := exec.Command(bash, "-n", filepath.Join(dir, rel))
 				if out, err := cmd.CombinedOutput(); err != nil {
 					t.Errorf("%s is not valid bash: %v\n%s", rel, err, out)
@@ -321,7 +568,7 @@ func TestInit_HooksAreShellValid(t *testing.T) {
 // enable, restart, stop, or disable services during install or upgrade.
 func TestInit_HooksLeaveLifecycleToDeployment(t *testing.T) {
 	s := newScaffolder()
-	for _, tmpl := range []string{"app", "multi"} {
+	for _, tmpl := range []string{"app", "mixed", "multi", "service"} {
 		t.Run(tmpl, func(t *testing.T) {
 			dir := t.TempDir()
 			if err := s.Init(dir, scaffold.Context{Template: tmpl, App: "testapp"}, false); err != nil {
@@ -353,7 +600,34 @@ func TestInit_HooksLeaveLifecycleToDeployment(t *testing.T) {
 	}
 }
 
-// TestInit_ServiceFileRename checks that service units and launch scripts are
+// TestInit_HooksSupportLocalExtensions checks that generated service hooks can
+// delegate to optional local scripts under /etc/<app>/hooks/.
+func TestInit_HooksSupportLocalExtensions(t *testing.T) {
+	s := newScaffolder()
+	for _, tmpl := range []string{"app", "mixed", "multi", "service"} {
+		t.Run(tmpl, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := s.Init(dir, scaffold.Context{Template: tmpl, App: "testapp"}, false); err != nil {
+				t.Fatal(err)
+			}
+			cases := map[string]string{
+				"deploy/scripts/postinstall.sh": "/etc/testapp/hooks/postinstall.local.sh",
+				"deploy/scripts/preremove.sh":   "/etc/testapp/hooks/preremove.local.sh",
+			}
+			for rel, want := range cases {
+				data, err := os.ReadFile(filepath.Join(dir, rel))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !strings.Contains(string(data), want) {
+					t.Errorf("%s missing local hook reference %q", rel, want)
+				}
+			}
+		})
+	}
+}
+
+// TestInit_ServiceFileRename checks that service units and generated commands are
 // renamed correctly for all templates.
 func TestInit_ServiceFileRename(t *testing.T) {
 	s := newScaffolder()
@@ -364,12 +638,23 @@ func TestInit_ServiceFileRename(t *testing.T) {
 		{"app", []string{
 			"deploy/systemd/myapp.service",
 			"deploy/bin/myapp",
+			"deploy/run/myapp",
+		}},
+		{"cli", []string{
+			"deploy/bin/myapp",
+		}},
+		{"mixed", []string{
+			"deploy/systemd/myapp-service.service",
+			"deploy/bin/myapp",
+			"deploy/bin/myapp-service",
+			"deploy/run/myapp-service",
 		}},
 		{"multi", []string{
 			"deploy/systemd/myapp-backend.service",
 			"deploy/systemd/myapp-frontend.service",
-			"deploy/bin/myapp-backend",
-			"deploy/bin/myapp-frontend",
+			"deploy/bin/myapp",
+			"deploy/run/myapp-backend",
+			"deploy/run/myapp-frontend",
 		}},
 	}
 	for _, tc := range tests {

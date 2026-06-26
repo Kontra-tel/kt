@@ -33,15 +33,21 @@ contents:
   # - src: resources
   #   dst: /usr/lib/{{.App}}/resources
 
-  # Backend launch script — edit deploy/bin/{{.App}}-backend to set the command.
-  - src: deploy/bin/{{.App}}-backend
-    dst: /usr/bin/{{.App}}-backend
+  # User-facing metadata command.
+  - src: deploy/bin/{{.App}}
+    dst: /usr/bin/{{.App}}
     file_info:
       mode: 0755
 
-  # Frontend launch script — edit deploy/bin/{{.App}}-frontend to set the command.
-  - src: deploy/bin/{{.App}}-frontend
-    dst: /usr/bin/{{.App}}-frontend
+  # Backend service runner — used by the service manager.
+  - src: deploy/run/{{.App}}-backend
+    dst: /usr/lib/{{.App}}/bin/{{.App}}-backend
+    file_info:
+      mode: 0755
+
+  # Frontend service runner — used by the service manager.
+  - src: deploy/run/{{.App}}-frontend
+    dst: /usr/lib/{{.App}}/bin/{{.App}}-frontend
     file_info:
       mode: 0755
 

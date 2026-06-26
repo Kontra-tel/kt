@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -67,15 +68,19 @@ Usage:
   kt update-tools [--dir .] [--force]
   kt config get <key>
   kt config set <key> <value>
-  kt config show
+  kt config show [--json]
+  kt config shape
   kt config init|diff|check
   kt release patch|minor|major
-  kt update [--check]
+  kt release set <version>
+  kt update [--check] [--prerelease]
   kt doctor
   kt version
 
 Examples:
-  kt init app my-api
+  kt init service my-api
+  kt init cli my-tool
+  kt init mixed my-suite
   kt init multi my-platform
   make build
   make package`
@@ -116,8 +121,11 @@ func cmdInit(s scaffold.Scaffolder, args []string) {
 		tui.Err(err.Error())
 		os.Exit(1)
 	}
+	if tmplName == "app" {
+		tui.Warn("template 'app' is kept for compatibility; prefer 'service' for new projects")
+	}
 	tui.OK("created project structure")
-	tui.Info("next: cd " + appName + " && make doctor && make build && make package")
+	tui.Info("next: " + initNextHint(dir))
 }
 
 func promptInit(s scaffold.Scaffolder, positional []string) (tmplName, appName string) {
@@ -184,7 +192,7 @@ func cmdInstallTools(s scaffold.Scaffolder, args []string) {
 
 func cmdConfig(args []string) {
 	if len(args) < 1 {
-		tui.Err("usage: kt config get <key> | set <key> <value> | show | init|diff|check")
+		tui.Err("usage: kt config get <key> | set <key> <value> | show [--json] | shape | init|diff|check")
 		os.Exit(2)
 	}
 	switch args[0] {
@@ -210,6 +218,28 @@ func cmdConfig(args []string) {
 		}
 		tui.OK(args[1] + " = " + args[2])
 	case "show":
+		if len(args) > 1 && args[1] == "--json" {
+			project, err := ktconfig.Load()
+			if err != nil {
+				tui.Err(err.Error())
+				os.Exit(1)
+			}
+			out := map[string]any{
+				"template": project.Template,
+				"app":      project.App,
+				"kind":     project.Kind,
+				"services": project.ServicesList(),
+				"user":     project.User,
+				"group":    project.Group,
+			}
+			enc := json.NewEncoder(os.Stdout)
+			enc.SetIndent("", "  ")
+			if err := enc.Encode(out); err != nil {
+				tui.Err(err.Error())
+				os.Exit(1)
+			}
+			return
+		}
 		pairs, err := ktconfig.All()
 		if err != nil {
 			tui.Err(err.Error())
@@ -219,6 +249,27 @@ func cmdConfig(args []string) {
 		for _, p := range pairs {
 			tui.Info(p[0] + ": " + p[1])
 		}
+	case "shape":
+		project, err := ktconfig.Load()
+		if err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
+		tui.Header("Project shape")
+		tui.Info("template: " + project.Template)
+		tui.Info("app:      " + project.App)
+		tui.Info("kind:     " + project.Kind)
+		if project.HasServices() {
+			tui.Info("services: " + strings.Join(project.ServicesList(), ", "))
+		} else {
+			tui.Info("services: none")
+		}
+		if project.User != "" {
+			tui.Info("user:     " + project.User)
+		}
+		if project.Group != "" {
+			tui.Info("group:    " + project.Group)
+		}
 	default:
 		runMake("config-" + args[0])
 	}
@@ -226,21 +277,50 @@ func cmdConfig(args []string) {
 
 func cmdRelease(args []string) {
 	if len(args) < 1 {
-		tui.Err("usage: kt release patch|minor|major")
+		tui.Err("usage: kt release patch|minor|major | set <version>")
 		os.Exit(2)
 	}
-	v, err := versioning.Bump("version.txt", args[0])
-	if err != nil {
-		tui.Err(err.Error())
-		os.Exit(1)
+	switch args[0] {
+	case "patch", "minor", "major":
+		v, err := versioning.Bump("version.txt", args[0])
+		if err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
+		tui.OK("new version: " + v)
+	case "set":
+		if len(args) < 2 {
+			tui.Err("usage: kt release set <version>")
+			os.Exit(2)
+		}
+		v, err := versioning.Set("version.txt", args[1])
+		if err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
+		tui.OK("new version: " + v)
+	default:
+		tui.Err("usage: kt release patch|minor|major | set <version>")
+		os.Exit(2)
 	}
-	tui.OK("new version: " + v)
 }
 
 func cmdDoctor() { runMake("doctor") }
 
 func cmdUpdate(args []string) {
-	checkOnly := len(args) > 0 && args[0] == "--check"
+	checkOnly := false
+	includePrerelease := false
+	for _, arg := range args {
+		switch arg {
+		case "--check":
+			checkOnly = true
+		case "--prerelease":
+			includePrerelease = true
+		default:
+			tui.Err("usage: kt update [--check] [--prerelease]")
+			os.Exit(2)
+		}
+	}
 
 	if version == "dev" {
 		tui.Warn("skipping update check for dev build")
@@ -264,23 +344,35 @@ func cmdUpdate(args []string) {
 	}
 
 	tui.Header("Checking for updates")
-	latest, newer, err := updater.Check(releaseAPI, version)
+	latest, newer, err := updater.Check(releaseAPI, version, includePrerelease)
 	if err != nil {
 		tui.Err("check failed: " + err.Error())
 		os.Exit(1)
 	}
 	if !newer {
 		tui.OK("already up to date (" + version + ")")
+		if checkOnly && !includePrerelease {
+			if preLatest, preNewer, preErr := updater.Check(releaseAPI, version, true); preErr == nil && preNewer && preLatest != latest {
+				tui.Info("prerelease available: " + preLatest + " (use kt update --check --prerelease or kt update --prerelease)")
+			}
+		}
 		return
 	}
 	tui.Info("new version available: " + latest + " (current: " + version + ")")
+	if includePrerelease {
+		tui.Info("channel: prerelease enabled")
+	} else if checkOnly {
+		if preLatest, preNewer, preErr := updater.Check(releaseAPI, version, true); preErr == nil && preNewer && preLatest != latest {
+			tui.Info("new prerelease also available: " + preLatest + " (use kt update --check --prerelease or kt update --prerelease)")
+		}
+	}
 
 	if checkOnly {
 		os.Exit(1)
 	}
 
 	tui.Header("Updating")
-	if err := updater.Apply(releaseAPI); err != nil {
+	if err := updater.Apply(releaseAPI, includePrerelease); err != nil {
 		tui.Err(err.Error())
 		os.Exit(1)
 	}
@@ -319,3 +411,24 @@ func runMake(target string) {
 }
 
 func mustGetwd() string { wd, _ := os.Getwd(); return wd }
+
+func initNextHint(dir string) string {
+	projectFile := filepath.Join(dir, ".kt", "project.yaml")
+	project, err := ktconfig.LoadFile(projectFile)
+	if err != nil {
+		return "make doctor && make build && make package"
+	}
+	var steps []string
+	if dir != "." {
+		steps = append(steps, "cd "+dir)
+	}
+	steps = append(steps, "make doctor", "make build")
+	switch project.Kind {
+	case "cli":
+		steps = append(steps, "make run")
+	case "service", "multi-service", "mixed":
+		steps = append(steps, "make print-info")
+	}
+	steps = append(steps, "make package")
+	return strings.Join(steps, " && ")
+}

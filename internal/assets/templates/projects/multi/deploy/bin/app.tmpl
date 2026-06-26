@@ -1,0 +1,69 @@
+#!/bin/sh
+
+print_text() {
+cat <<'EOF'
+{{.App}}
+type: multi-service
+config: /etc/{{.App}}/app.env
+hooks: /etc/{{.App}}/hooks/
+data: /var/lib/{{.App}}
+logs: /var/log/{{.App}}
+services:
+  - {{.App}}-backend
+  - {{.App}}-frontend
+units:
+  - {{.App}}-backend.service
+  - {{.App}}-frontend.service
+runners:
+  - /usr/lib/{{.App}}/bin/{{.App}}-backend
+  - /usr/lib/{{.App}}/bin/{{.App}}-frontend
+
+Use:
+  {{.App}} --json
+  systemctl status {{.App}}-backend
+  systemctl status {{.App}}-frontend
+  systemctl restart {{.App}}-backend
+  systemctl restart {{.App}}-frontend
+EOF
+}
+
+print_json() {
+cat <<'EOF'
+{
+  "app": "{{.App}}",
+  "kind": "multi-service",
+  "config": "/etc/{{.App}}/app.env",
+  "hooks": "/etc/{{.App}}/hooks",
+  "data": "/var/lib/{{.App}}",
+  "logs": "/var/log/{{.App}}",
+  "services": ["{{.App}}-backend", "{{.App}}-frontend"],
+  "units": ["{{.App}}-backend.service", "{{.App}}-frontend.service"],
+  "runners": ["/usr/lib/{{.App}}/bin/{{.App}}-backend", "/usr/lib/{{.App}}/bin/{{.App}}-frontend"]
+}
+EOF
+}
+
+print_help() {
+cat <<'EOF'
+Usage: {{.App}} [--json]
+
+Print package metadata and operator hints for the packaged services.
+EOF
+}
+
+case "${1:-}" in
+  "")
+    print_text
+    ;;
+  --json)
+    print_json
+    ;;
+  --help|-h)
+    print_help
+    ;;
+  *)
+    echo "unknown argument: $1" >&2
+    print_help >&2
+    exit 2
+    ;;
+esac

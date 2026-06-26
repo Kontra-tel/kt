@@ -15,7 +15,7 @@ include .kt/mk/nfpm.mk
 
 # ── Project targets ────────────────────────────────────────────────────────────
 
-.PHONY: test build-backend build-frontend build install
+.PHONY: test build-backend build-frontend build run-backend run-frontend print-info install
 
 test: ## Run backend and frontend tests
 	@echo "TODO: add backend test command"
@@ -32,5 +32,14 @@ build-frontend: ## Build frontend
 	@mkdir -p dist/app/frontend
 
 build: build-backend build-frontend ## Build all components
+
+run-backend: build-backend ## Run backend locally
+	@sh deploy/run/$(APP)-backend
+
+run-frontend: build-frontend ## Run frontend locally
+	@sh deploy/run/$(APP)-frontend
+
+print-info: ## Show packaged service metadata
+	@sh deploy/bin/$(APP)
 
 install: local-install ## Install package on this machine

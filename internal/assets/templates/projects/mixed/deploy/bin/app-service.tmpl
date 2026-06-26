@@ -3,22 +3,22 @@
 print_text() {
 cat <<'EOF'
 {{.App}}
-type: service
-runner: /usr/lib/{{.App}}/bin/{{.App}}
+type: mixed
+command: /usr/bin/{{.App}}
+service-runner: /usr/lib/{{.App}}/bin/{{.App}}-service
 config: /etc/{{.App}}/app.env
 hooks: /etc/{{.App}}/hooks/
 data: /var/lib/{{.App}}
 logs: /var/log/{{.App}}
 services:
-  - {{.App}}
+  - {{.App}}-service
 units:
-  - {{.App}}.service
+  - {{.App}}-service.service
 
 Use:
-  {{.App}} --json
-  systemctl status {{.App}}
-  systemctl restart {{.App}}
-  journalctl -u {{.App}} -n 100
+  {{.App}}-service --json
+  systemctl status {{.App}}-service
+  systemctl restart {{.App}}-service
 EOF
 }
 
@@ -26,23 +26,24 @@ print_json() {
 cat <<'EOF'
 {
   "app": "{{.App}}",
-  "kind": "service",
-  "runner": "/usr/lib/{{.App}}/bin/{{.App}}",
+  "kind": "mixed",
+  "command": "/usr/bin/{{.App}}",
+  "service_runner": "/usr/lib/{{.App}}/bin/{{.App}}-service",
   "config": "/etc/{{.App}}/app.env",
   "hooks": "/etc/{{.App}}/hooks",
   "data": "/var/lib/{{.App}}",
   "logs": "/var/log/{{.App}}",
-  "services": ["{{.App}}"],
-  "units": ["{{.App}}.service"]
+  "services": ["{{.App}}-service"],
+  "units": ["{{.App}}-service.service"]
 }
 EOF
 }
 
 print_help() {
 cat <<'EOF'
-Usage: {{.App}} [--json]
+Usage: {{.App}}-service [--json]
 
-Print service package metadata and operator hints.
+Print metadata and operator hints for the packaged companion service.
 EOF
 }
 

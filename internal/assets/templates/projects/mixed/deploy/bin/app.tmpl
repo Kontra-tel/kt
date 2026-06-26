@@ -1,0 +1,9 @@
+#!/bin/sh
+# Command shim for {{.App}}
+# ──────────────────────────────────────────────────────────────────────────────
+# This script is installed to /usr/bin/{{.App}} by nFPM.
+#
+# Edit the exec line below to match your CLI runtime.
+# ──────────────────────────────────────────────────────────────────────────────
+
+exec /usr/lib/{{.App}}/{{.App}} "$@"

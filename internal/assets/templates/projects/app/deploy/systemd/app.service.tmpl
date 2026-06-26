@@ -16,9 +16,9 @@ WorkingDirectory=/var/lib/{{.App}}
 # directly and pass its path via an env var or ExecStart argument instead.
 EnvironmentFile=-/etc/{{.App}}/app.env
 
-# The launch script at /usr/bin/{{.App}} handles interpreter-specific flags.
-# Edit deploy/bin/{{.App}} rather than this file to change the launch command.
-ExecStart=/usr/bin/{{.App}}
+# The service runner under /usr/lib/{{.App}}/bin is the systemd entrypoint.
+# Edit deploy/run/{{.App}} rather than this file to change the launch command.
+ExecStart=/usr/lib/{{.App}}/bin/{{.App}}
 
 # Restart automatically if the process exits unexpectedly.
 Restart=on-failure

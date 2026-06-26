@@ -27,6 +27,18 @@ type TemplateInfo struct {
 	Desc string
 }
 
+type templateAlias struct {
+	Target string
+	Desc   string
+}
+
+var templateAliases = map[string]templateAlias{
+	"service": {
+		Target: "app",
+		Desc:   "Single-service application package",
+	},
+}
+
 func (s Scaffolder) Templates() ([]string, error) {
 	infos, err := s.TemplatesWithDesc()
 	if err != nil {
@@ -58,7 +70,13 @@ func (s Scaffolder) TemplatesWithDesc() ([]TemplateInfo, error) {
 				}
 			}
 		}
+		if info.Name == "app" && info.Desc != "" {
+			info.Desc += " (legacy name; use service)"
+		}
 		out = append(out, info)
+	}
+	for name, alias := range templateAliases {
+		out = append(out, TemplateInfo{Name: name, Desc: alias.Desc})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
@@ -96,7 +114,7 @@ func (s Scaffolder) Init(dest string, ctx Context, force bool) error {
 	if err := s.InstallTools(dest, force); err != nil {
 		return err
 	}
-	base := "templates/projects/" + ctx.Template
+	base := "templates/projects/" + resolveTemplate(ctx.Template)
 	if _, err := fs.Stat(s.FS, base); err != nil {
 		return fmt.Errorf("unknown template %q", ctx.Template)
 	}
@@ -127,9 +145,14 @@ func copyTree(efs embed.FS, srcRoot, dstRoot string, ctx *Context, force bool) e
 		dstRel := rel
 		if ctx != nil {
 			dstRel = strings.ReplaceAll(dstRel, "app.service", ctx.App+".service")
+			dstRel = strings.ReplaceAll(dstRel, "service.service", ctx.App+"-service.service")
 			dstRel = strings.ReplaceAll(dstRel, "backend.service", ctx.App+"-backend.service")
 			dstRel = strings.ReplaceAll(dstRel, "frontend.service", ctx.App+"-frontend.service")
 			dstRel = strings.ReplaceAll(dstRel, "cmd/app", "cmd/"+ctx.App)
+			dstRel = strings.ReplaceAll(dstRel, "deploy/run/app", "deploy/run/"+ctx.App)
+			dstRel = strings.ReplaceAll(dstRel, "deploy/run/service", "deploy/run/"+ctx.App+"-service")
+			dstRel = strings.ReplaceAll(dstRel, "deploy/run/backend", "deploy/run/"+ctx.App+"-backend")
+			dstRel = strings.ReplaceAll(dstRel, "deploy/run/frontend", "deploy/run/"+ctx.App+"-frontend")
 			// deploy/bin/app → deploy/bin/<app>; also handles app-backend and app-frontend suffixes
 			dstRel = strings.ReplaceAll(dstRel, "deploy/bin/app", "deploy/bin/"+ctx.App)
 		}
@@ -164,7 +187,7 @@ func copyTree(efs embed.FS, srcRoot, dstRoot string, ctx *Context, force bool) e
 			return err
 		}
 		mode := fs.FileMode(0644)
-		if strings.HasSuffix(dst, ".sh") || strings.Contains(dst, "/deploy/bin/") {
+		if strings.HasSuffix(dst, ".sh") || strings.Contains(dst, "/deploy/bin/") || strings.Contains(dst, "/deploy/run/") {
 			mode = 0755
 		}
 		return os.WriteFile(dst, data, mode)
@@ -185,12 +208,19 @@ func gitAuthor() string {
 	return ""
 }
 
+func resolveTemplate(name string) string {
+	if alias, ok := templateAliases[name]; ok {
+		return alias.Target
+	}
+	return name
+}
+
 func chmodScripts(root string) error {
 	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
 		}
-		if strings.HasSuffix(path, ".sh") || strings.Contains(path, "/deploy/bin/") {
+		if strings.HasSuffix(path, ".sh") || strings.Contains(path, "/deploy/bin/") || strings.Contains(path, "/deploy/run/") {
 			return os.Chmod(path, 0755)
 		}
 		return nil

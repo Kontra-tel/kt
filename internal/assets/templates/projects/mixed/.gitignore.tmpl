@@ -1,0 +1,9 @@
+dist/
+*.deb
+*.rpm
+*.pkg.tar.zst
+
+# Actual runtime config — never commit these (they may contain secrets).
+# Commit only the *.example counterparts.
+deploy/config/*
+!deploy/config/*.example

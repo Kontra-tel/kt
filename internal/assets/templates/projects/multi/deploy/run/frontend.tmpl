@@ -1,10 +1,8 @@
 #!/bin/sh
-# Launch script for {{.App}} frontend
+# Service runner for {{.App}} frontend
 # ──────────────────────────────────────────────────────────────────────────────
-# Installed to /usr/bin/{{.App}}-frontend by nFPM.
-# Used by the systemd unit (ExecStart) and for running the frontend directly.
-#
-# Edit the exec line below to match your frontend runtime. Examples:
+# This script is packaged for the service manager. Edit the exec line below to
+# match your frontend runtime.
 #
 #   Node (Nuxt 3):  exec /usr/bin/node /usr/lib/{{.App}}/frontend/server/index.mjs "$@"
 #   Node (Express): exec /usr/bin/node /usr/lib/{{.App}}/frontend/index.js "$@"

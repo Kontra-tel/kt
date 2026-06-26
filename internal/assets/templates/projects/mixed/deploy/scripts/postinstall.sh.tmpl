@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# postinstall.sh — runs after the package is installed on the target machine.
+set -euo pipefail
+
+NOLOGIN=$(command -v nologin 2>/dev/null || echo /usr/sbin/nologin)
+id -u {{.ServiceUser}} >/dev/null 2>&1 \
+  || useradd --system --home /var/lib/{{.App}} --shell "$NOLOGIN" {{.ServiceUser}}
+
+mkdir -p /etc/{{.App}} /etc/{{.App}}/hooks /var/lib/{{.App}} /var/log/{{.App}}
+chown -R {{.ServiceUser}}:{{.ServiceGroup}} /var/lib/{{.App}} /var/log/{{.App}}
+
+for example in /etc/{{.App}}/*.example; do
+  [ -f "$example" ] || continue
+  target="${example%.example}"
+  [ -f "$target" ] || cp "$example" "$target"
+done
+
+if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+  systemctl daemon-reload || true
+fi
+
+if [ -x /etc/{{.App}}/hooks/postinstall.local.sh ]; then
+  KT_APP="{{.App}}" \
+  KT_KIND="mixed" \
+  KT_SERVICES="{{.App}}-service" \
+  KT_SERVICE_USER="{{.ServiceUser}}" \
+  KT_SERVICE_GROUP="{{.ServiceGroup}}" \
+    /etc/{{.App}}/hooks/postinstall.local.sh "$@"
+fi

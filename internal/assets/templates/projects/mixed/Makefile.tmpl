@@ -1,0 +1,37 @@
+# DOCTOR_TOOLS — space-separated list of tools your build requires.
+# `make doctor` checks each one is present on PATH.
+# Add your compiler, runtime, or build tool here (e.g. go, mvn, node, npm).
+DOCTOR_TOOLS := git make nfpm
+
+include .kt/mk/common.mk
+include .kt/mk/version.mk
+include .kt/mk/config.mk
+include .kt/mk/doctor.mk
+include .kt/mk/nfpm.mk
+
+.PHONY: test build-cli build-service build run run-service print-info install
+
+test: ## Run CLI and service tests
+	@echo "TODO: add CLI test command"
+	@echo "TODO: add service test command"
+
+build-cli: ## Build CLI
+	@echo "TODO: add CLI build command"
+	@mkdir -p dist/app
+
+build-service: ## Build service component
+	@echo "TODO: add service build command"
+	@mkdir -p dist/app/service
+
+build: build-cli build-service ## Build all components
+
+run: build-cli ## Run CLI locally
+	@sh deploy/bin/$(APP)
+
+run-service: build-service ## Run service locally
+	@sh deploy/run/$(APP)-service
+
+print-info: ## Show packaged service metadata
+	@sh deploy/bin/$(APP)-service
+
+install: local-install ## Install package on this machine

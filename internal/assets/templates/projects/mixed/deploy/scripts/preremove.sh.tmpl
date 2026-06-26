@@ -2,14 +2,10 @@
 # preremove.sh — runs before the package is removed or upgraded.
 set -euo pipefail
 
-# Package managers invoke removal hooks during upgrades as well as removals.
-# Generic packages keep lifecycle policy outside the package itself. Teams that
-# need stop/drain logic can provide an executable hook at:
-#   /etc/{{.App}}/hooks/preremove.local.sh
 if [ -x /etc/{{.App}}/hooks/preremove.local.sh ]; then
   KT_APP="{{.App}}" \
-  KT_KIND="service" \
-  KT_SERVICES="{{.App}}" \
+  KT_KIND="mixed" \
+  KT_SERVICES="{{.App}}-service" \
   KT_SERVICE_USER="{{.ServiceUser}}" \
   KT_SERVICE_GROUP="{{.ServiceGroup}}" \
     /etc/{{.App}}/hooks/preremove.local.sh "$@"

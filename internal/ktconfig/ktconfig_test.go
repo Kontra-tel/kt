@@ -140,3 +140,46 @@ func TestAll_SkipsComments(t *testing.T) {
 		t.Errorf("got %d pairs, want 1 (comments should be skipped)", len(pairs))
 	}
 }
+
+func TestLoad_NormalizesServiceProject(t *testing.T) {
+	setup(t, "template: service\napp: my-api\nkind: service\nuser: svc\ngroup: ops\n")
+	project, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if project.Kind != "service" {
+		t.Fatalf("kind = %q, want service", project.Kind)
+	}
+	if project.Services != "my-api" {
+		t.Fatalf("services = %q, want my-api", project.Services)
+	}
+	got := project.ServicesList()
+	if len(got) != 1 || got[0] != "my-api" {
+		t.Fatalf("ServicesList() = %v, want [my-api]", got)
+	}
+}
+
+func TestLoad_NormalizesLegacyMultiProject(t *testing.T) {
+	setup(t, "template: multi\napp: suite\n")
+	project, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if project.Kind != "multi-service" {
+		t.Fatalf("kind = %q, want multi-service", project.Kind)
+	}
+	if project.Services != "suite-backend,suite-frontend" {
+		t.Fatalf("services = %q", project.Services)
+	}
+}
+
+func TestLoad_NormalizesCLIProject(t *testing.T) {
+	setup(t, "template: cli\napp: tool\nkind: cli\nservices:\n")
+	project, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if project.HasServices() {
+		t.Fatalf("HasServices() = true, want false")
+	}
+}

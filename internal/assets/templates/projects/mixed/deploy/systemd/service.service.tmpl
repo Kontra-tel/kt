@@ -1,0 +1,19 @@
+[Unit]
+Description={{.App}} companion service
+After=network.target
+
+[Service]
+User={{.ServiceUser}}
+Group={{.ServiceGroup}}
+WorkingDirectory=/var/lib/{{.App}}
+EnvironmentFile=-/etc/{{.App}}/app.env
+ExecStart=/usr/lib/{{.App}}/bin/{{.App}}-service
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/{{.App}} /var/log/{{.App}}
+
+[Install]
+WantedBy=multi-user.target

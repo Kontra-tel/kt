@@ -1,10 +1,8 @@
 #!/bin/sh
-# Launch script for {{.App}} backend
+# Service runner for {{.App}} backend
 # ──────────────────────────────────────────────────────────────────────────────
-# Installed to /usr/bin/{{.App}}-backend by nFPM.
-# Used by the systemd unit (ExecStart) and for running the backend directly.
-#
-# Edit the exec line below to match your backend runtime. Examples:
+# This script is packaged for the service manager. Edit the exec line below to
+# match your backend runtime.
 #
 #   Java JAR:   exec java ${JAVA_OPTS:--Xmx512m} -jar /usr/lib/{{.App}}/backend/backend.jar "$@"
 #   Go binary:  exec /usr/lib/{{.App}}/backend/{{.App}}-backend "$@"
