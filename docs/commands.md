@@ -34,14 +34,16 @@ kt templates
 
 ## kt install-tools / kt update-tools
 
-Install or update the shared `.kt/mk/` and `.kt/scripts/` tooling into the current project directory.
+Install or update the shared `.kt/mk/` tooling into the current project directory.
 
 ```bash
 kt install-tools [--dir .] [--force]
 kt update-tools  [--dir .] [--force]
 ```
 
-Run `kt update-tools` in an existing project after upgrading `kt` to pull in the latest shared Makefile includes.
+`kt install-tools` copies `.kt/mk/` into an existing directory without overwriting local files unless you pass `--force`.
+
+Run `kt update-tools` in an existing project after upgrading `kt` to refresh the shared `.kt/mk/` files. Unlike `install-tools`, `update-tools` overwrites those shared files by default so the checked-in tooling actually updates.
 
 ## kt config
 

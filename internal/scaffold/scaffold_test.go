@@ -73,6 +73,60 @@ func TestInit_MissingApp(t *testing.T) {
 	}
 }
 
+func TestInstallTools_DoesNotOverwriteWithoutForce(t *testing.T) {
+	s := newScaffolder()
+	dir := t.TempDir()
+	target := filepath.Join(dir, ".kt", "mk", "common.mk")
+
+	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(target, []byte("local change\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.InstallTools(dir, false); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "local change\n" {
+		t.Fatalf("install-tools should keep existing files without force, got:\n%s", data)
+	}
+}
+
+func TestInstallTools_OverwritesWithForce(t *testing.T) {
+	s := newScaffolder()
+	dir := t.TempDir()
+	target := filepath.Join(dir, ".kt", "mk", "common.mk")
+
+	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(target, []byte("stale\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.InstallTools(dir, true); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+	if content == "stale\n" {
+		t.Fatal("expected force install to overwrite existing file")
+	}
+	if !strings.Contains(content, "build-metadata:") {
+		t.Fatalf("expected scaffolded common.mk content, got:\n%s", content)
+	}
+}
+
 // TestInit_UnknownTemplate checks that Init fails for an unknown template.
 func TestInit_UnknownTemplate(t *testing.T) {
 	s := newScaffolder()
@@ -523,8 +577,6 @@ func TestInit_HooksAreShellValid(t *testing.T) {
 			}
 			paths := []string{
 				"deploy/bin/testapp",
-				".kt/scripts/postinstall-systemd.sh",
-				".kt/scripts/preremove-systemd.sh",
 			}
 			switch tmpl {
 			case "app", "service":
@@ -577,8 +629,6 @@ func TestInit_HooksLeaveLifecycleToDeployment(t *testing.T) {
 			for _, rel := range []string{
 				"deploy/scripts/postinstall.sh",
 				"deploy/scripts/preremove.sh",
-				".kt/scripts/postinstall-systemd.sh",
-				".kt/scripts/preremove-systemd.sh",
 			} {
 				data, err := os.ReadFile(filepath.Join(dir, rel))
 				if err != nil {

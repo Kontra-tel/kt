@@ -83,7 +83,7 @@ func (s Scaffolder) TemplatesWithDesc() ([]TemplateInfo, error) {
 }
 
 func (s Scaffolder) InstallTools(dest string, force bool) error {
-	pairs := []struct{ src, dst string }{{"common/mk", ".kt/mk"}, {"common/scripts", ".kt/scripts"}}
+	pairs := []struct{ src, dst string }{{"common/mk", ".kt/mk"}}
 	for _, p := range pairs {
 		if err := copyTree(s.FS, p.src, filepath.Join(dest, p.dst), nil, force); err != nil {
 			return err

@@ -36,9 +36,9 @@ func main() {
 	case "templates":
 		cmdTemplates(s)
 	case "install-tools":
-		cmdInstallTools(s, os.Args[2:])
+		cmdInstallTools(s, os.Args[2:], false)
 	case "update-tools":
-		cmdInstallTools(s, os.Args[2:])
+		cmdInstallTools(s, os.Args[2:], true)
 	case "config":
 		cmdConfig(os.Args[2:])
 	case "release":
@@ -177,17 +177,29 @@ func cmdTemplates(s scaffold.Scaffolder) {
 	}
 }
 
-func cmdInstallTools(s scaffold.Scaffolder, args []string) {
-	fs := flag.NewFlagSet("install-tools", flag.ExitOnError)
+func cmdInstallTools(s scaffold.Scaffolder, args []string, update bool) {
+	name := "install-tools"
+	header := "Installing local kt tooling"
+	success := "installed .kt/mk"
+	forceDefault := false
+	forceUsage := "overwrite existing files"
+	if update {
+		name = "update-tools"
+		header = "Updating local kt tooling"
+		success = "updated .kt/mk"
+		forceDefault = true
+		forceUsage = "overwrite existing files (default true for updates)"
+	}
+	fs := flag.NewFlagSet(name, flag.ExitOnError)
 	dir := fs.String("dir", ".", "target directory")
-	force := fs.Bool("force", false, "overwrite existing files")
+	force := fs.Bool("force", forceDefault, forceUsage)
 	_ = fs.Parse(args)
-	tui.Header("Installing local kt tooling")
+	tui.Header(header)
 	if err := s.InstallTools(*dir, *force); err != nil {
 		tui.Err(err.Error())
 		os.Exit(1)
 	}
-	tui.OK("installed .kt/mk and .kt/scripts")
+	tui.OK(success)
 }
 
 func cmdConfig(args []string) {

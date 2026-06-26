@@ -16,7 +16,7 @@ administrator-managed overrides.
 
 ## Existing projects
 
-`kt update-tools` refreshes shared `.kt/mk/` and `.kt/scripts/` files. It does
+`kt update-tools` refreshes shared `.kt/mk/` files. It does
 not rewrite project-specific templates. Existing projects should migrate
 deliberately:
 

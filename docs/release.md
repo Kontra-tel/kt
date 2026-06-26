@@ -79,7 +79,7 @@ Dev builds (version = `dev`) skip the check.
 
 ## Updating project tooling
 
-After upgrading `kt`, run this in each project to pull in the latest `.kt/mk/` and `.kt/scripts/`:
+After upgrading `kt`, run this in each project to pull in the latest `.kt/mk/`:
 
 ```bash
 kt update-tools
@@ -98,9 +98,6 @@ internal/assets/
       doctor.mk
       nfpm.mk
       version.mk
-    scripts/
-      postinstall-systemd.sh
-      preremove-systemd.sh
   templates/
     projects/
       app/
