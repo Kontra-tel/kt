@@ -1,3 +1,3 @@
-module git.kontra.tel/kontra.tel/build-tools
+module git.kontra.tel/kontra.tel/Kt
 
 go 1.22
