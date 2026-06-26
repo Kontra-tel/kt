@@ -82,8 +82,8 @@ Bump `version.txt` and print the new version.
 ```bash
 kt release patch   # 1.2.3 -> 1.2.4
 kt release minor   # 1.2.3 -> 1.3.0
-kt release major   # 1.2.3 -> 2.0.0
-kt release set 2.0.0-rc.1
+kt release major   # 1.2.3 -> next major version
+kt release set 1.3.0-rc.1
 ```
 
 ## kt update
@@ -100,7 +100,7 @@ Automatically re-runs with `sudo` if the install location requires elevated perm
 Has no effect on dev builds.
 By default, `kt update` only installs stable releases. `kt update --check`
 still informs you when a newer prerelease exists. Use `--prerelease` to opt
-into downloading prerelease versions such as `2.0.0-rc.1`. `--check` and
+into downloading prerelease versions such as `1.3.0-rc.1`. `--check` and
 `--prerelease` are intentionally separate modes.
 
 ## kt doctor

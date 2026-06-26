@@ -1,7 +1,7 @@
-# 2.0 migration
+# 1.3 migration
 
-Use this guide when validating or adopting `2.0.0-rc.1` and later `2.0.x`
-releases. `kt` 2.0 changes both the scaffold contract and the default service
+Use this guide when validating or adopting `1.3.0-rc.1` and later `1.3.x`
+releases. `kt` 1.3 changes both the scaffold contract and the default service
 packaging shape.
 
 ## Breaking changes at a glance
@@ -38,12 +38,12 @@ Existing projects can add `kind` and `services` manually if they want `kt config
 
 ## Service runner split
 
-Before 2.0, service templates used `/usr/bin/<app>` as both:
+Before 1.3, service templates used `/usr/bin/<app>` as both:
 
 - the user-facing command
 - the systemd `ExecStart` target
 
-2.0 separates those concerns:
+1.3 separates those concerns:
 
 - `/usr/bin/<app>` now prints package metadata for pure service packages
 - `/usr/lib/<app>/bin/<app>` is the service manager runtime entrypoint
@@ -61,7 +61,7 @@ For mixed packages:
 
 ## Lifecycle hook extensions
 
-Generated package hooks are still generic by default. 2.0 formalizes the local
+Generated package hooks are still generic by default. 1.3 formalizes the local
 extension point:
 
 ```text
@@ -85,7 +85,7 @@ Keep the previous package available so rollback can reinstall a known-good build
 
 ## RC validation checklist
 
-Before shipping `2.0.0-rc.1` or promoting it to `2.0.0`, verify these on a
+Before shipping `1.3.0-rc.1` or promoting it to `1.3.0`, verify these on a
 real host or CI runner:
 
 1. `make test` passes

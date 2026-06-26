@@ -11,17 +11,17 @@ Actions → Release → Run workflow → choose mode, version strategy, and whet
 The workflow (`gitea/workflows/release.yaml`) supports two release modes:
 
 - `bump`: increment `version.txt` by `patch`, `minor`, or `major`
-- `set-version`: set an exact version such as `2.0.0-rc.1`
+- `set-version`: set an exact version such as `1.3.0-rc.1`
 
 Mark prerelease builds with the `prerelease` input when creating release
 candidates, betas, or alphas.
 
-### Example: 2.0.0-rc.1
+### Example: 1.3.0-rc.1
 
 Use these workflow inputs:
 
 - `mode`: `set-version`
-- `version`: `2.0.0-rc.1`
+- `version`: `1.3.0-rc.1`
 - `prerelease`: `true`
 
 The workflow will:
@@ -65,7 +65,7 @@ kt update --prerelease
 
 By default, updates only install stable releases. Plain `kt update --check`
 still informs you when a newer prerelease exists. Pass `--prerelease` to opt
-into channels such as `2.0.0-rc.1`. `--check` and `--prerelease` are kept as
+into channels such as `1.3.0-rc.1`. `--check` and `--prerelease` are kept as
 separate modes on purpose.
 
 Dev builds (version = `dev`) skip the check.

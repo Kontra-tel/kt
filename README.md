@@ -65,9 +65,9 @@ It is **not** a deployment framework — it sets up the structure, then normal L
 kt templates   # list all available templates
 ```
 
-## 2.0 changes
+## 1.3 changes
 
-`2.0.0` changes the public scaffold model in a few important ways:
+`1.3.0` changes the public scaffold model in a few important ways:
 
 - `service` is now the preferred single-service template name
 - `app` still works, but it is now the legacy name for that same scaffold
@@ -75,7 +75,7 @@ kt templates   # list all available templates
 - `.kt/project.yaml` now carries explicit `kind` and `services` fields
 - prerelease updates require `kt update --prerelease`
 
-If you are upgrading an existing project, read [2.0 migration](docs/migration-2.0.md).
+If you are upgrading an existing project, read [1.3 migration](docs/migration-1.3.md).
 
 ## Self-update
 
@@ -90,6 +90,6 @@ kt update --prerelease
 - [Commands](docs/commands.md)
 - [Templates](docs/templates.md)
 - [Packaging](docs/packaging.md)
-- [2.0 migration](docs/migration-2.0.md)
+- [1.3 migration](docs/migration-1.3.md)
 - [Filesystem layout migration](docs/migration-fhs.md)
 - [Release & maintenance](docs/release.md)
