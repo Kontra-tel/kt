@@ -21,6 +21,8 @@ curl -sL https://git.kontra.tel/kontra.tel/Kt/raw/branch/main/scripts/install.sh
 
 Installs the right binary for your OS and architecture to `/usr/local/bin/kt`.
 Override the destination with `BIN_DIR=~/bin bash <(curl ...)`.
+Install an exact prerelease with `KT_VERSION=1.3.0-rc.1 bash <(curl ...)`, or
+the newest prerelease with `KT_PRERELEASE=1 bash <(curl ...)`.
 
 **With Go:**
 

@@ -53,6 +53,13 @@ SHA256SUMS
 make release   # produces dist/kt-* binaries and SHA256SUMS (no packages)
 ```
 
+### Install prereleases with the script
+
+```bash
+KT_VERSION=1.3.0-rc.1 bash <(curl -sL https://git.kontra.tel/kontra.tel/Kt/raw/branch/main/scripts/install.sh)
+KT_PRERELEASE=1 bash <(curl -sL https://git.kontra.tel/kontra.tel/Kt/raw/branch/main/scripts/install.sh)
+```
+
 ## Updating kt
 
 ```bash
