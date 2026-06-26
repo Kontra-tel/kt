@@ -27,6 +27,17 @@ project contract.
 Use `kt config show --json` or `kt config shape` to inspect the normalized
 contract from an existing project.
 
+The generated `.kt/project.yaml` file also includes inline comments so users
+can see which fields are safe to customize after scaffold.
+
+Editing guidance:
+
+- `template`: keep this as the original scaffold family name
+- `app`: changing this later affects package paths, binary names, and service names
+- `kind`: do not change this unless you are deliberately reshaping the project
+- `services`: update this if you rename packaged service units
+- `user` / `group`: safe to customize for service-bearing templates
+
 ## App shapes
 
 - `cli`: `/usr/bin/<app>` is the runnable command.
@@ -46,6 +57,7 @@ service manager a dedicated runtime entrypoint.
 | `deploy/bin/<app>` | `/usr/bin/<app>` | Runnable user command |
 | `deploy/config/*.example` | `/etc/<app>/` | Runtime config examples |
 | `dist/app/` | `/usr/lib/<app>/` | Application artifacts |
+| `dist/app/meta/build.json` | `/usr/lib/<app>/meta/build.json` | Generated build metadata |
 
 ### `service`
 
@@ -59,6 +71,7 @@ service manager a dedicated runtime entrypoint.
 | `deploy/scripts/postinstall.sh` | nFPM hook | Host prep + optional local extension |
 | `deploy/scripts/preremove.sh` | nFPM hook | Generic removal hook + optional local extension |
 | `dist/app/` | `/usr/lib/<app>/` | Application artifacts |
+| `dist/app/meta/build.json` | `/usr/lib/<app>/meta/build.json` | Generated build metadata |
 
 ### `mixed`
 
@@ -73,6 +86,7 @@ service manager a dedicated runtime entrypoint.
 | `deploy/scripts/postinstall.sh` | nFPM hook | Host prep + optional local extension |
 | `deploy/scripts/preremove.sh` | nFPM hook | Generic removal hook + optional local extension |
 | `dist/app/` | `/usr/lib/<app>/` | Application artifacts |
+| `dist/app/meta/build.json` | `/usr/lib/<app>/meta/build.json` | Generated build metadata |
 
 ### `multi`
 
@@ -88,6 +102,7 @@ service manager a dedicated runtime entrypoint.
 | `deploy/scripts/postinstall.sh` | nFPM hook | Host prep + optional local extension |
 | `deploy/scripts/preremove.sh` | nFPM hook | Generic removal hook + optional local extension |
 | `dist/app/` | `/usr/lib/<app>/` | Application artifacts |
+| `dist/app/meta/build.json` | `/usr/lib/<app>/meta/build.json` | Generated build metadata |
 
 Service-bearing templates also create:
 

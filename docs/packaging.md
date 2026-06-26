@@ -57,6 +57,35 @@ Generated service packages use a distribution-neutral Linux layout:
 Use `/etc/systemd/system/` for administrator-managed overrides, not packaged
 units.
 
+## Build metadata
+
+Packaged projects also include a generated build metadata file at:
+
+```text
+/usr/lib/<app>/meta/build.json
+```
+
+It is created during `make package` and includes fields such as:
+
+- `app`
+- `version`
+- `template`
+- `kind`
+- `services`
+- `service_user`
+- `service_group`
+- `commit`
+- `full_commit`
+- `branch`
+- `build_date`
+- `dirty`
+- `build_host`
+- `build_os`
+- `build_arch`
+
+Applications can read that file directly to expose a lightweight build-info
+endpoint without hardcoding packaging details into the app binary.
+
 ## Service lifecycle
 
 Generated hooks create writable directories, initialize config without
