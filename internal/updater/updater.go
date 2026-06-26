@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"strings"
 
-	"git.kontra.tel/kontra.tel/build-tools/internal/versioning"
+	"git.kontra.tel/kontra.tel/Kt/internal/versioning"
 )
 
 type Release struct {

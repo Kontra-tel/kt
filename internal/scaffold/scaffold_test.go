@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"git.kontra.tel/kontra.tel/build-tools/internal/assets"
-	"git.kontra.tel/kontra.tel/build-tools/internal/scaffold"
+	"git.kontra.tel/kontra.tel/Kt/internal/assets"
+	"git.kontra.tel/kontra.tel/Kt/internal/scaffold"
 )
 
 func newScaffolder() scaffold.Scaffolder {

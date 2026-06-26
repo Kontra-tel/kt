@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"git.kontra.tel/kontra.tel/build-tools/internal/updater"
+	"git.kontra.tel/kontra.tel/Kt/internal/updater"
 )
 
 func releaseServer(t *testing.T, releases []updater.Release) *httptest.Server {

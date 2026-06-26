@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"git.kontra.tel/kontra.tel/build-tools/internal/versioning"
+	"git.kontra.tel/kontra.tel/Kt/internal/versioning"
 )
 
 func writeVersion(t *testing.T, v string) string {

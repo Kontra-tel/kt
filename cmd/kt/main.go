@@ -9,12 +9,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"git.kontra.tel/kontra.tel/build-tools/internal/assets"
-	"git.kontra.tel/kontra.tel/build-tools/internal/ktconfig"
-	"git.kontra.tel/kontra.tel/build-tools/internal/scaffold"
-	"git.kontra.tel/kontra.tel/build-tools/internal/tui"
-	"git.kontra.tel/kontra.tel/build-tools/internal/updater"
-	"git.kontra.tel/kontra.tel/build-tools/internal/versioning"
+	"git.kontra.tel/kontra.tel/Kt/internal/assets"
+	"git.kontra.tel/kontra.tel/Kt/internal/ktconfig"
+	"git.kontra.tel/kontra.tel/Kt/internal/scaffold"
+	"git.kontra.tel/kontra.tel/Kt/internal/tui"
+	"git.kontra.tel/kontra.tel/Kt/internal/updater"
+	"git.kontra.tel/kontra.tel/Kt/internal/versioning"
 )
 
 var (

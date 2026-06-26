@@ -25,7 +25,7 @@ Override the destination with `BIN_DIR=~/bin bash <(curl ...)`.
 **With Go:**
 
 ```bash
-GOPRIVATE=git.kontra.tel go install git.kontra.tel/kontra.tel/build-tools/cmd/kt@latest
+go install git.kontra.tel/kontra.tel/Kt/cmd/kt@latest
 ```
 
 **From source:**
