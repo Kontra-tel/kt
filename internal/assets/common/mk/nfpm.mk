@@ -6,15 +6,15 @@ NFPM_ARCH ?= $(shell uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/;s/armv7l/a
 
 .PHONY: package package-deb package-rpm local-install
 
-package: build ## Build package with nFPM (override: NFPM_PACKAGER=deb|rpm|archlinux)
+package: build build-metadata ## Build package with nFPM (override: NFPM_PACKAGER=deb|rpm|archlinux)
 	@mkdir -p dist
 	APP=$(APP) ARCH=$(NFPM_ARCH) VERSION=$(VERSION) nfpm package -f $(NFPM_CONFIG) -p $(NFPM_PACKAGER) -t dist/
 
-package-deb: build ## Build .deb package explicitly
+package-deb: build build-metadata ## Build .deb package explicitly
 	@mkdir -p dist
 	APP=$(APP) ARCH=$(NFPM_ARCH) VERSION=$(VERSION) nfpm package -f $(NFPM_CONFIG) -p deb -t dist/
 
-package-rpm: build ## Build .rpm package explicitly
+package-rpm: build build-metadata ## Build .rpm package explicitly
 	@mkdir -p dist
 	APP=$(APP) ARCH=$(NFPM_ARCH) VERSION=$(VERSION) nfpm package -f $(NFPM_CONFIG) -p rpm -t dist/
 
