@@ -10,7 +10,6 @@ on:
 
 jobs:
   release:
-    if: ${{ !contains(github.event.head_commit.message, 'ci: restore version.txt') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -29,6 +28,7 @@ jobs:
         env:
           BRANCH: ${{ github.ref_name }}
           SHA: ${{ github.sha }}
+          HEAD_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           VERSION=$(tr -d '\n' < version.txt)
           TAG="v${VERSION}"
@@ -36,6 +36,15 @@ jobs:
           VALID=true
           PRERELEASE=false
           ERROR=""
+
+          case "$HEAD_MESSAGE" in
+            *"ci: restore version.txt"*)
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "valid=false" >> "$GITHUB_OUTPUT"
+              echo "error=skip restore commit" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
 
           case "$BRANCH" in
             main)
@@ -68,11 +77,12 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
           echo "previous=$PREVIOUS" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
           echo "valid=$VALID" >> "$GITHUB_OUTPUT"
           echo "error=$ERROR" >> "$GITHUB_OUTPUT"
 
       - name: Restore invalid version.txt
-        if: ${{ steps.validate.outputs.valid != 'true' && steps.validate.outputs.previous != '' }}
+        if: ${{ steps.validate.outputs.skip != 'true' && steps.validate.outputs.valid != 'true' && steps.validate.outputs.previous != '' }}
         env:
           BRANCH: ${{ github.ref_name }}
           PREVIOUS: ${{ steps.validate.outputs.previous }}
@@ -87,21 +97,29 @@ jobs:
           fi
 
       - name: Stop on invalid release version
-        if: ${{ steps.validate.outputs.valid != 'true' }}
+        if: ${{ steps.validate.outputs.skip != 'true' && steps.validate.outputs.valid != 'true' }}
         run: |
           echo "${{ steps.validate.outputs.error }}" >&2
           exit 1
 
+      - name: Stop on restore commit
+        if: ${{ steps.validate.outputs.skip == 'true' }}
+        run: exit 0
+
       - name: Test
+        if: ${{ steps.validate.outputs.skip != 'true' }}
         run: go test ./...
 
       - name: Build binaries
+        if: ${{ steps.validate.outputs.skip != 'true' }}
         run: ./scripts/release.sh
 
       - name: Install nfpm
+        if: ${{ steps.validate.outputs.skip != 'true' }}
         run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
 
       - name: Build Linux packages
+        if: ${{ steps.validate.outputs.skip != 'true' }}
         env:
           VERSION: ${{ steps.validate.outputs.version }}
         run: |
@@ -114,9 +132,11 @@ jobs:
           done
 
       - name: Update checksums
+        if: ${{ steps.validate.outputs.skip != 'true' }}
         run: cd dist && sha256sum kt-* *.deb *.rpm > SHA256SUMS
 
       - name: Create and push tag
+        if: ${{ steps.validate.outputs.skip != 'true' }}
         env:
           TAG: ${{ steps.validate.outputs.tag }}
         run: |
@@ -124,6 +144,7 @@ jobs:
           git push origin "$TAG"
 
       - name: Collect release notes
+        if: ${{ steps.validate.outputs.skip != 'true' }}
         env:
           SHA: ${{ github.sha }}
         run: |
@@ -136,6 +157,7 @@ jobs:
           printf '%s\n' "$BODY" > /tmp/release-notes.txt
 
       - name: Create or update release and upload assets
+        if: ${{ steps.validate.outputs.skip != 'true' }}
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.validate.outputs.tag }}
