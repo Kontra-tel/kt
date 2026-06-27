@@ -1,10 +1,10 @@
-name: Release
+name: Prepare Release Tag
 
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Release mode'
+        description: "Release mode"
         required: true
         default: bump
         type: choice
@@ -12,7 +12,7 @@ on:
           - bump
           - set-version
       bump:
-        description: 'Version bump type for bump mode'
+        description: "Version bump type for bump mode"
         required: true
         default: patch
         type: choice
@@ -21,17 +21,12 @@ on:
           - minor
           - major
       version:
-        description: 'Exact version for set-version mode, e.g. 1.3.0-rc.1'
+        description: "Exact version for set-version mode, e.g. 1.3.0-rc.1"
         required: false
         type: string
-      prerelease:
-        description: 'Mark the created release as a prerelease'
-        required: true
-        default: false
-        type: boolean
 
 jobs:
-  release:
+  prepare:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -45,7 +40,7 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Bump version
+      - name: Resolve version
         id: ver
         run: |
           if [ "${{ inputs.mode }}" = "set-version" ]; then
@@ -59,89 +54,63 @@ jobs:
             go run ./cmd/kt release "${{ inputs.bump }}"
             NEW=$(tr -d '\n' < version.txt)
           fi
+
           echo "version=$NEW" >> "$GITHUB_OUTPUT"
+          echo "tag=v$NEW" >> "$GITHUB_OUTPUT"
+
+      - name: Validate branch and version policy
+        env:
+          BRANCH: ${{ github.ref_name }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          case "$BRANCH" in
+            main)
+              if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$'; then
+                echo "main may only produce rc versions such as 1.3.0-rc.1" >&2
+                exit 1
+              fi
+              ;;
+            release/*)
+              if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+                echo "release branches may only produce stable versions such as 1.3.0" >&2
+                exit 1
+              fi
+              ;;
+            *)
+              echo "release tags may only be prepared from main or release/* branches" >&2
+              exit 1
+              ;;
+          esac
 
       - name: Test
         run: go test ./...
 
-      - name: Build binaries
-        run: ./scripts/release.sh
-
-      - name: Install nfpm
-        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
-
-      - name: Build Linux packages
-        env:
-          VERSION: ${{ steps.ver.outputs.version }}
-        run: |
-          for arch in amd64 arm64; do
-            cp dist/kt-linux-${arch} kt
-            chmod +x kt
-            ARCH=${arch} VERSION=${VERSION} nfpm package -f nfpm.yaml -p deb -t dist/
-            ARCH=${arch} VERSION=${VERSION} nfpm package -f nfpm.yaml -p rpm -t dist/
-            rm kt
-          done
-
-      - name: Update checksums
-        run: cd dist && sha256sum kt-* *.deb *.rpm > SHA256SUMS
-
-      - name: Commit and tag
+      - name: Commit version change
         env:
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
           git config user.name "gitea-actions[bot]"
           git config user.email "gitea-actions[bot]@noreply"
           git add version.txt
-          git commit -m "release: v${VERSION}"
-          git tag -a "v${VERSION}" -m "Release v${VERSION}"
-          git push origin HEAD:${{ github.ref_name }}
-          git push origin "v${VERSION}"
-
-      - name: Collect release notes
-        id: notes
-        env:
-          VERSION: ${{ steps.ver.outputs.version }}
-        run: |
-          LAST=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-          if [ -n "$LAST" ]; then
-            BODY=$(git log --oneline "${LAST}..HEAD~1" | sed 's/^/- /')
+          if ! git diff --cached --quiet; then
+            git commit -m "release: v${VERSION}"
+            git push origin HEAD:${{ github.ref_name }}
           else
-            BODY="Initial release."
+            echo "version.txt already set to ${VERSION}; tagging current commit"
           fi
-          # Write to a file to avoid quoting issues
-          printf '%s\n' "$BODY" > /tmp/release-notes.txt
 
-      - name: Create release and upload assets
+      - name: Create and push tag
         env:
-          TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.ver.outputs.version }}
-          PRERELEASE: ${{ inputs.prerelease }}
-          API_URL: ${{ github.api_url }}
-          REPO: ${{ github.repository }}
+          TAG: ${{ steps.ver.outputs.tag }}
         run: |
-          BODY=$(cat /tmp/release-notes.txt)
-
-          RELEASE_ID=$(curl -sf -X POST "${API_URL}/repos/${REPO}/releases" \
-            -H "Authorization: token ${TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "$(python3 -c "
-          import json, os, sys
-          print(json.dumps({
-            'tag_name': 'v${VERSION}',
-            'name': 'v${VERSION}',
-            'body': open('/tmp/release-notes.txt').read().strip(),
-            'prerelease': os.environ['PRERELEASE'].lower() == 'true',
-          }))")" \
-            | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
-
-          echo "Release ID: ${RELEASE_ID}"
-
-          for f in dist/kt-* dist/*.deb dist/*.rpm dist/SHA256SUMS; do
-            [ -f "$f" ] || continue
-            NAME=$(basename "$f")
-            echo "Uploading ${NAME}..."
-            curl -sf -X POST "${API_URL}/repos/${REPO}/releases/${RELEASE_ID}/assets?name=${NAME}" \
-              -H "Authorization: token ${TOKEN}" \
-              -H "Content-Type: application/octet-stream" \
-              --data-binary "@$f"
-          done
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "tag $TAG already exists locally" >&2
+            exit 1
+          fi
+          git fetch --tags origin
+          if git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "tag $TAG already exists on origin" >&2
+            exit 1
+          fi
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"

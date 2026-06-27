@@ -2,36 +2,57 @@
 
 ## Releasing kt
 
-Releases are triggered manually from Gitea's Actions UI:
+Releases now use a two-step flow:
+
+1. Run `Prepare Release Tag` from Gitea's Actions UI on the branch you want to release from.
+2. That workflow commits `version.txt` if needed and pushes `v...`.
+3. The pushed tag triggers `Publish Release`, which builds artifacts and creates the Gitea release.
 
 ```text
-Actions → Release → Run workflow → choose mode, version strategy, and whether the release is marked prerelease
+Actions → Prepare Release Tag → Run workflow
 ```
 
-The workflow (`gitea/workflows/release.yaml`) supports two release modes:
+The manual workflow (`.gitea/workflows/release.yaml`) supports two version modes:
 
 - `bump`: increment `version.txt` by `patch`, `minor`, or `major`
 - `set-version`: set an exact version such as `1.3.0-rc.1`
 
-Mark prerelease builds with the `prerelease` input when creating release
-candidates, betas, or alphas.
+The publish workflow (`.gitea/workflows/publish.yaml`) determines prerelease vs stable automatically from the tag.
+
+### Branch policy
+
+- `main` may only produce RC tags such as `v1.3.0-rc.1`
+- `release/*` branches may only produce stable tags such as `v1.3.0`
+
+This is validated both when preparing the tag and when publishing it.
 
 ### Example: 1.3.0-rc.1
 
-Use these workflow inputs:
+Run `Prepare Release Tag` on `main` with:
 
 - `mode`: `set-version`
 - `version`: `1.3.0-rc.1`
-- `prerelease`: `true`
 
-The workflow will:
+The workflows will:
 
-1. Bump `version.txt` by the chosen increment and commit it
+1. Set or bump `version.txt` and commit it when required
 2. Run `go test ./...`
-3. Build cross-platform binaries via `scripts/release.sh`
-4. Build Linux packages (`.deb` + `.rpm`) for amd64 and arm64 via nFPM
-5. Push the commit and create an annotated git tag
-6. Create a Gitea release and upload all artifacts
+3. Push an annotated `v1.3.0-rc.1` tag
+4. Build cross-platform binaries via `scripts/release.sh`
+5. Build Linux packages (`.deb` + `.rpm`) for amd64 and arm64 via nFPM
+6. Create a prerelease in Gitea and upload all artifacts
+
+### Example: 1.3.0
+
+Run `Prepare Release Tag` on `release/1.3` with either:
+
+- `mode`: `bump`
+- `bump`: `patch`
+
+or:
+
+- `mode`: `set-version`
+- `version`: `1.3.0`
 
 ### Release artifacts
 
