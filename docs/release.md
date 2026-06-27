@@ -2,57 +2,46 @@
 
 ## Releasing kt
 
-Releases now use a two-step flow:
+Releases are driven by `version.txt`.
 
-1. Run `Prepare Release Tag` from Gitea's Actions UI on the branch you want to release from.
-2. That workflow commits `version.txt` if needed and pushes `v...`.
-3. The pushed tag triggers `Publish Release`, which builds artifacts and creates the Gitea release.
+When `version.txt` changes on `main` or `release/*`, the `Release` workflow in
+[.gitea/workflows/release.yaml](/home/markus/Projektit/projects/kt/.gitea/workflows/release.yaml:1)
+automatically:
 
-```text
-Actions → Prepare Release Tag → Run workflow
-```
-
-The manual workflow (`.gitea/workflows/release.yaml`) supports two version modes:
-
-- `bump`: increment `version.txt` by `patch`, `minor`, or `major`
-- `set-version`: set an exact version such as `1.3.0-rc.1`
-
-The publish workflow (`.gitea/workflows/publish.yaml`) determines prerelease vs stable automatically from the tag.
+1. validates the version against the branch
+2. restores `version.txt` if the new value is invalid
+3. runs `go test ./...`
+4. creates and pushes tag `v<version>`
+5. builds artifacts and creates the Gitea release
 
 ### Branch policy
 
-- `main` may only produce RC tags such as `v1.3.0-rc.1`
-- `release/*` branches may only produce stable tags such as `v1.3.0`
+- `main` may only release RC versions such as `1.3.0-rc.1`
+- `release/*` branches may only release stable versions such as `1.3.0`
 
-This is validated both when preparing the tag and when publishing it.
+If the branch/version combination is invalid, the workflow does not push a tag.
+It restores `version.txt` to the previous value in a follow-up bot commit.
 
 ### Example: 1.3.0-rc.1
 
-Run `Prepare Release Tag` on `main` with:
+1. Change `version.txt` to `1.3.0-rc.1` on `main`
+2. Push the commit
 
-- `mode`: `set-version`
-- `version`: `1.3.0-rc.1`
+The workflow will:
 
-The workflows will:
-
-1. Set or bump `version.txt` and commit it when required
-2. Run `go test ./...`
-3. Push an annotated `v1.3.0-rc.1` tag
-4. Build cross-platform binaries via `scripts/release.sh`
-5. Build Linux packages (`.deb` + `.rpm`) for amd64 and arm64 via nFPM
-6. Create a prerelease in Gitea and upload all artifacts
+1. validate that `main` is only releasing an RC
+2. run `go test ./...`
+3. push annotated tag `v1.3.0-rc.1`
+4. build cross-platform binaries via `scripts/release.sh`
+5. build Linux packages (`.deb` + `.rpm`) for amd64 and arm64 via nFPM
+6. create a prerelease in Gitea and upload all artifacts
 
 ### Example: 1.3.0
 
-Run `Prepare Release Tag` on `release/1.3` with either:
+1. Change `version.txt` to `1.3.0` on `release/1.3`
+2. Push the commit
 
-- `mode`: `bump`
-- `bump`: `patch`
-
-or:
-
-- `mode`: `set-version`
-- `version`: `1.3.0`
+The same workflow will publish a stable release.
 
 ### Release artifacts
 

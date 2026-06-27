@@ -1,32 +1,16 @@
-name: Prepare Release Tag
+name: Release
 
 on:
-  workflow_dispatch:
-    inputs:
-      mode:
-        description: "Release mode"
-        required: true
-        default: bump
-        type: choice
-        options:
-          - bump
-          - set-version
-      bump:
-        description: "Version bump type for bump mode"
-        required: true
-        default: patch
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
-      version:
-        description: "Exact version for set-version mode, e.g. 1.3.0-rc.1"
-        required: false
-        type: string
+  push:
+    branches:
+      - main
+      - release/**
+    paths:
+      - version.txt
 
 jobs:
-  prepare:
+  release:
+    if: ${{ !contains(github.event.head_commit.message, 'ci: restore version.txt') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -40,77 +24,163 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Resolve version
-        id: ver
-        run: |
-          if [ "${{ inputs.mode }}" = "set-version" ]; then
-            if [ -z "${{ inputs.version }}" ]; then
-              echo "version input is required for set-version mode" >&2
-              exit 1
-            fi
-            go run ./cmd/kt release set "${{ inputs.version }}"
-            NEW="${{ inputs.version }}"
-          else
-            go run ./cmd/kt release "${{ inputs.bump }}"
-            NEW=$(tr -d '\n' < version.txt)
-          fi
-
-          echo "version=$NEW" >> "$GITHUB_OUTPUT"
-          echo "tag=v$NEW" >> "$GITHUB_OUTPUT"
-
-      - name: Validate branch and version policy
+      - name: Validate release version
+        id: validate
         env:
           BRANCH: ${{ github.ref_name }}
-          VERSION: ${{ steps.ver.outputs.version }}
+          SHA: ${{ github.sha }}
         run: |
+          VERSION=$(tr -d '\n' < version.txt)
+          TAG="v${VERSION}"
+          PREVIOUS=$(git show "${SHA}^:version.txt" 2>/dev/null | tr -d '\n' || true)
+          VALID=true
+          PRERELEASE=false
+          ERROR=""
+
           case "$BRANCH" in
             main)
-              if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$'; then
-                echo "main may only produce rc versions such as 1.3.0-rc.1" >&2
-                exit 1
+              if printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$'; then
+                PRERELEASE=true
+              else
+                VALID=false
+                ERROR="main may only release rc versions such as 1.3.0-rc.1"
               fi
               ;;
             release/*)
               if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-                echo "release branches may only produce stable versions such as 1.3.0" >&2
-                exit 1
+                VALID=false
+                ERROR="release branches may only release stable versions such as 1.3.0"
               fi
               ;;
             *)
-              echo "release tags may only be prepared from main or release/* branches" >&2
-              exit 1
+              VALID=false
+              ERROR="releases may only run from main or release/* branches"
               ;;
           esac
 
-      - name: Test
-        run: go test ./...
+          git fetch --tags origin
+          if [ "$VALID" = true ] && git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
+            VALID=false
+            ERROR="tag $TAG already exists"
+          fi
 
-      - name: Commit version change
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+          echo "previous=$PREVIOUS" >> "$GITHUB_OUTPUT"
+          echo "valid=$VALID" >> "$GITHUB_OUTPUT"
+          echo "error=$ERROR" >> "$GITHUB_OUTPUT"
+
+      - name: Restore invalid version.txt
+        if: ${{ steps.validate.outputs.valid != 'true' && steps.validate.outputs.previous != '' }}
         env:
-          VERSION: ${{ steps.ver.outputs.version }}
+          BRANCH: ${{ github.ref_name }}
+          PREVIOUS: ${{ steps.validate.outputs.previous }}
         run: |
+          printf '%s\n' "$PREVIOUS" > version.txt
           git config user.name "gitea-actions[bot]"
           git config user.email "gitea-actions[bot]@noreply"
           git add version.txt
           if ! git diff --cached --quiet; then
-            git commit -m "release: v${VERSION}"
-            git push origin HEAD:${{ github.ref_name }}
-          else
-            echo "version.txt already set to ${VERSION}; tagging current commit"
+            git commit -m "ci: restore version.txt"
+            git push origin HEAD:${BRANCH}
           fi
+
+      - name: Stop on invalid release version
+        if: ${{ steps.validate.outputs.valid != 'true' }}
+        run: |
+          echo "${{ steps.validate.outputs.error }}" >&2
+          exit 1
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build binaries
+        run: ./scripts/release.sh
+
+      - name: Install nfpm
+        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+
+      - name: Build Linux packages
+        env:
+          VERSION: ${{ steps.validate.outputs.version }}
+        run: |
+          for arch in amd64 arm64; do
+            cp dist/kt-linux-${arch} kt
+            chmod +x kt
+            ARCH=${arch} VERSION=${VERSION} nfpm package -f nfpm.yaml -p deb -t dist/
+            ARCH=${arch} VERSION=${VERSION} nfpm package -f nfpm.yaml -p rpm -t dist/
+            rm kt
+          done
+
+      - name: Update checksums
+        run: cd dist && sha256sum kt-* *.deb *.rpm > SHA256SUMS
 
       - name: Create and push tag
         env:
-          TAG: ${{ steps.ver.outputs.tag }}
+          TAG: ${{ steps.validate.outputs.tag }}
         run: |
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "tag $TAG already exists locally" >&2
-            exit 1
-          fi
-          git fetch --tags origin
-          if git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
-            echo "tag $TAG already exists on origin" >&2
-            exit 1
-          fi
           git tag -a "$TAG" -m "Release $TAG"
           git push origin "$TAG"
+
+      - name: Collect release notes
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          LAST=$(git describe --tags --abbrev=0 "${SHA}^" 2>/dev/null || echo "")
+          if [ -n "$LAST" ]; then
+            BODY=$(git log --oneline "${LAST}..${SHA}" | sed 's/^/- /')
+          else
+            BODY="Initial release."
+          fi
+          printf '%s\n' "$BODY" > /tmp/release-notes.txt
+
+      - name: Create or update release and upload assets
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.validate.outputs.tag }}
+          PRERELEASE: ${{ steps.validate.outputs.prerelease }}
+          API_URL: ${{ github.api_url }}
+          REPO: ${{ github.repository }}
+        run: |
+          RELEASE_JSON=/tmp/release.json
+
+          if curl -sf "${API_URL}/repos/${REPO}/releases/tags/${TAG}" \
+            -H "Authorization: token ${TOKEN}" > "${RELEASE_JSON}"; then
+            RELEASE_ID=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('id', ''))" "${RELEASE_JSON}")
+          else
+            RELEASE_ID=""
+          fi
+
+          if [ -z "$RELEASE_ID" ]; then
+            curl -sf -X POST "${API_URL}/repos/${REPO}/releases" \
+              -H "Authorization: token ${TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d "$(python3 -c "
+          import json, os
+          print(json.dumps({
+            'tag_name': os.environ['TAG'],
+            'name': os.environ['TAG'],
+            'body': open('/tmp/release-notes.txt').read().strip(),
+            'prerelease': os.environ['PRERELEASE'].lower() == 'true',
+          }))")" \
+              > "${RELEASE_JSON}"
+            RELEASE_ID=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['id'])" "${RELEASE_JSON}")
+          fi
+
+          echo "Release ID: ${RELEASE_ID}"
+
+          for f in dist/kt-* dist/*.deb dist/*.rpm dist/SHA256SUMS; do
+            [ -f "$f" ] || continue
+            NAME=$(basename "$f")
+            ASSET_ID=$(python3 -c "import json,sys; name=sys.argv[2]; data=json.load(open(sys.argv[1])); print(next((str(a['id']) for a in data.get('assets', []) if a.get('name') == name), ''))" "${RELEASE_JSON}" "$NAME")
+            if [ -n "$ASSET_ID" ]; then
+              curl -sf -X DELETE "${API_URL}/repos/${REPO}/releases/${RELEASE_ID}/assets/${ASSET_ID}" \
+                -H "Authorization: token ${TOKEN}"
+            fi
+            echo "Uploading ${NAME}..."
+            curl -sf -X POST "${API_URL}/repos/${REPO}/releases/${RELEASE_ID}/assets?name=${NAME}" \
+              -H "Authorization: token ${TOKEN}" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary "@$f"
+          done
