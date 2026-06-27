@@ -88,8 +88,8 @@ jobs:
           PREVIOUS: ${{ steps.validate.outputs.previous }}
         run: |
           printf '%s\n' "$PREVIOUS" > version.txt
-          git config user.name "gitea-actions[bot]"
-          git config user.email "gitea-actions[bot]@noreply"
+          git config user.name "infra-bot"
+          git config user.email "bot@intra.tel"
           git add version.txt
           if ! git diff --cached --quiet; then
             git commit -m "ci: restore version.txt"
@@ -140,6 +140,8 @@ jobs:
         env:
           TAG: ${{ steps.validate.outputs.tag }}
         run: |
+          git config user.name "infra-bot"
+          git config user.email "bot@intra.tel"
           git tag -a "$TAG" -m "Release $TAG"
           git push origin "$TAG"
 
