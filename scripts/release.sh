@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
-VERSION="$(cat version.txt)"
 COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+TAG="$(git describe --tags --exact-match HEAD 2>/dev/null || true)"
+VERSION="${VERSION:-${TAG#v}}"
+if [ -z "$VERSION" ] || [ "$VERSION" = "$TAG" ]; then
+  VERSION="0.0.0-dev.${COMMIT}"
+fi
 mkdir -p dist
 for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
   GOOS="${target%/*}"

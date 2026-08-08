@@ -2,46 +2,25 @@
 
 ## Releasing kt
 
-Releases are driven by `version.txt`.
+Releases are driven by immutable annotated Git tags. Push a strict SemVer tag in
+the form `v<version>` and the `Release` workflow builds artifacts and creates
+the matching Gitea release.
 
-When `version.txt` changes on `main` or `release/*`, the `Release` workflow in
-[.gitea/workflows/release.yaml](/home/markus/Projektit/projects/kt/.gitea/workflows/release.yaml:1)
-automatically:
+```bash
+kt release next patch
+kt release push 1.3.0
+```
 
-1. validates the version against the branch
-2. restores `version.txt` if the new value is invalid
-3. runs `go test ./...`
-4. creates and pushes tag `v<version>`
-5. builds artifacts and creates the Gitea release
+The `push` command requires a clean working tree and refuses a version that is
+already tagged locally or on `origin`. It never changes source files.
 
-### Branch policy
+### Prereleases
 
-- `main` may only release RC versions such as `1.3.0-rc.1`
-- `release/*` branches may only release stable versions such as `1.3.0`
+Prerelease tags have a SemVer suffix and are marked as prereleases in Gitea:
 
-If the branch/version combination is invalid, the workflow does not push a tag.
-It restores `version.txt` to the previous value in a follow-up bot commit.
-
-### Example: 1.3.0-rc.1
-
-1. Change `version.txt` to `1.3.0-rc.1` on `main`
-2. Push the commit
-
-The workflow will:
-
-1. validate that `main` is only releasing an RC
-2. run `go test ./...`
-3. push annotated tag `v1.3.0-rc.1`
-4. build cross-platform binaries via `scripts/release.sh`
-5. build Linux packages (`.deb` + `.rpm`) for amd64 and arm64 via nFPM
-6. create a prerelease in Gitea and upload all artifacts
-
-### Example: 1.3.0
-
-1. Change `version.txt` to `1.3.0` on `release/1.3`
-2. Push the commit
-
-The same workflow will publish a stable release.
+```bash
+kt release push 1.4.0-rc.1
+```
 
 ### Release artifacts
 
@@ -60,7 +39,8 @@ SHA256SUMS
 ### Build binaries locally
 
 ```bash
-make release   # produces dist/kt-* binaries and SHA256SUMS (no packages)
+make release                 # uses an exact v<semver> tag, or a dev version
+make release VERSION=1.3.0   # explicit local package/build version
 ```
 
 ### Install prereleases with the script
@@ -81,9 +61,7 @@ kt update --prerelease
 `kt update` downloads the matching binary for the current OS and architecture from Gitea and atomically replaces the running executable. If the install location requires elevated permissions (e.g. `/usr/local/bin`) it re-runs automatically with `sudo`.
 
 By default, updates only install stable releases. Plain `kt update --check`
-still informs you when a newer prerelease exists. Pass `--prerelease` to opt
-into channels such as `1.3.0-rc.1`. `--check` and `--prerelease` are kept as
-separate modes on purpose.
+into prerelease channels.
 
 Dev builds (version = `dev`) skip the check.
 
@@ -101,19 +79,9 @@ Templates and shared tooling are embedded into the `kt` binary at build time:
 
 ```text
 internal/assets/
-  common/
-    mk/
-      common.mk
-      config.mk
-      doctor.mk
-      nfpm.mk
-      version.mk
-  templates/
-    projects/
-      app/
-      cli/
-      mixed/
-      multi/
+  common/mk/
+  templates/projects/
 ```
 
-The `deploy/` folder at the repository root is only for packaging the `kt` binary itself and is unrelated to the project templates.
+The root `deploy/` folder only packages the `kt` binary itself; it is unrelated
+to generated project templates.

@@ -2,10 +2,12 @@ package versioning
 
 import (
 	"fmt"
-	"os"
+	"regexp"
 	"strconv"
 	"strings"
 )
+
+var versionPattern = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+)\.([1-9][0-9]*))?$`)
 
 type Version struct {
 	Major int
@@ -17,36 +19,25 @@ type Version struct {
 
 func Parse(s string) (Version, error) {
 	var v Version
-	main := s
-	if pre, ok := strings.CutPrefix(s, "v"); ok {
-		main = pre
-	}
-	parts := strings.SplitN(main, "-", 2)
-	core := strings.Split(parts[0], ".")
-	if len(core) != 3 {
-		return Version{}, fmt.Errorf("version must be x.y.z or x.y.z-label.n")
+	main := strings.TrimPrefix(strings.TrimSpace(s), "v")
+	matches := versionPattern.FindStringSubmatch(main)
+	if matches == nil {
+		return Version{}, fmt.Errorf("version must be strict semver: x.y.z or x.y.z-label.n")
 	}
 	var err error
-	if v.Major, err = strconv.Atoi(core[0]); err != nil {
+	if v.Major, err = strconv.Atoi(matches[1]); err != nil {
 		return Version{}, err
 	}
-	if v.Minor, err = strconv.Atoi(core[1]); err != nil {
+	if v.Minor, err = strconv.Atoi(matches[2]); err != nil {
 		return Version{}, err
 	}
-	if v.Patch, err = strconv.Atoi(core[2]); err != nil {
+	if v.Patch, err = strconv.Atoi(matches[3]); err != nil {
 		return Version{}, err
 	}
-	if len(parts) == 2 {
-		pre := strings.Split(parts[1], ".")
-		if len(pre) != 2 || strings.TrimSpace(pre[0]) == "" {
-			return Version{}, fmt.Errorf("prerelease must be label.number")
-		}
-		v.Pre = pre[0]
-		if v.PreN, err = strconv.Atoi(pre[1]); err != nil {
+	if matches[4] != "" {
+		v.Pre = matches[4]
+		if v.PreN, err = strconv.Atoi(matches[5]); err != nil {
 			return Version{}, err
-		}
-		if v.PreN < 1 {
-			return Version{}, fmt.Errorf("prerelease number must be >= 1")
 		}
 	}
 	return v, nil
@@ -57,6 +48,25 @@ func (v Version) String() string {
 		return fmt.Sprintf("%d.%d.%d-%s.%d", v.Major, v.Minor, v.Patch, v.Pre, v.PreN)
 	}
 	return fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
+}
+
+func (v Version) Next(kind string) (Version, error) {
+	v.Pre = ""
+	v.PreN = 0
+	switch kind {
+	case "patch":
+		v.Patch++
+	case "minor":
+		v.Minor++
+		v.Patch = 0
+	case "major":
+		v.Major++
+		v.Minor = 0
+		v.Patch = 0
+	default:
+		return Version{}, fmt.Errorf("unknown release kind %q", kind)
+	}
+	return v, nil
 }
 
 func (v Version) Compare(other Version) int {
@@ -87,50 +97,6 @@ func (v Version) Compare(other Version) int {
 		return 1
 	}
 	return cmp(v.PreN, other.PreN)
-}
-
-func Bump(file, kind string) (string, error) {
-	v, err := readVersion(file)
-	if err != nil {
-		return "", err
-	}
-	// Stable bumps always discard prerelease suffixes.
-	v.Pre = ""
-	v.PreN = 0
-	switch kind {
-	case "patch":
-		v.Patch++
-	case "minor":
-		v.Minor++
-		v.Patch = 0
-	case "major":
-		v.Major++
-		v.Minor = 0
-		v.Patch = 0
-	default:
-		return "", fmt.Errorf("unknown bump %q", kind)
-	}
-	return v.String(), writeVersion(file, v)
-}
-
-func Set(file, version string) (string, error) {
-	v, err := Parse(strings.TrimSpace(version))
-	if err != nil {
-		return "", err
-	}
-	return v.String(), writeVersion(file, v)
-}
-
-func readVersion(file string) (Version, error) {
-	b, err := os.ReadFile(file)
-	if err != nil {
-		return Version{}, err
-	}
-	return Parse(strings.TrimSpace(string(b)))
-}
-
-func writeVersion(file string, v Version) error {
-	return os.WriteFile(file, []byte(v.String()+"\n"), 0644)
 }
 
 func cmp(a, b int) int {

@@ -79,14 +79,18 @@ These delegate to the `config-init`, `config-check`, and `config-diff` Make targ
 
 ## kt release
 
-Bump `version.txt` and print the new version.
+Create immutable annotated release tags. Releases and deployment workflows should
+trigger from pushed `v<semver>` tags.
 
 ```bash
-kt release patch   # 1.2.3 -> 1.2.4
-kt release minor   # 1.2.3 -> 1.3.0
-kt release major   # 1.2.3 -> next major version
-kt release set 1.3.0-rc.1
+kt release next patch      # prints the next version from the latest reachable tag
+kt release tag 1.3.0       # create local annotated tag v1.3.0 at HEAD
+kt release push 1.3.0      # create and push v1.3.0
+kt release push 1.3.0-rc.1 # create and push a prerelease tag
 ```
+
+`tag` and `push` require a clean working tree, reject invalid SemVer versions,
+and refuse tags that already exist locally or on `origin`.
 
 ## kt update
 

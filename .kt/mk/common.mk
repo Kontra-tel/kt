@@ -2,8 +2,8 @@ SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
 
 APP ?= $(shell kt config get app 2>/dev/null)
-VERSION_FILE ?= version.txt
-VERSION ?= $(shell test -f $(VERSION_FILE) && cat $(VERSION_FILE) || echo 0.1.0)
+# Releases derive their version from an exact v<semver> tag. Override VERSION for local builds.
+VERSION ?= $(shell tag=$$(git describe --tags --exact-match HEAD 2>/dev/null || true); if [[ $$tag =~ ^v ]]; then printf '%s' "$${tag#v}"; else printf '0.0.0-dev.%s' "$$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"; fi)
 DIST_DIR ?= dist
 DEPLOY_DIR ?= deploy
 

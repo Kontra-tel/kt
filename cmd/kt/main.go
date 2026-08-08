@@ -71,8 +71,9 @@ Usage:
   kt config show [--json]
   kt config shape
   kt config init|diff|check
-  kt release patch|minor|major
-  kt release set <version>
+  kt release next <patch|minor|major>
+  kt release tag <version>
+  kt release push <version>
   kt update [--check] [--prerelease]
   kt doctor
   kt version
@@ -288,33 +289,98 @@ func cmdConfig(args []string) {
 }
 
 func cmdRelease(args []string) {
-	if len(args) < 1 {
-		tui.Err("usage: kt release patch|minor|major | set <version>")
+	if len(args) != 2 {
+		tui.Err("usage: kt release next <patch|minor|major> | tag <version> | push <version>")
 		os.Exit(2)
 	}
 	switch args[0] {
-	case "patch", "minor", "major":
-		v, err := versioning.Bump("version.txt", args[0])
+	case "next":
+		v, err := latestReleaseVersion()
 		if err != nil {
 			tui.Err(err.Error())
 			os.Exit(1)
 		}
-		tui.OK("new version: " + v)
-	case "set":
-		if len(args) < 2 {
-			tui.Err("usage: kt release set <version>")
-			os.Exit(2)
-		}
-		v, err := versioning.Set("version.txt", args[1])
+		next, err := v.Next(args[1])
 		if err != nil {
 			tui.Err(err.Error())
 			os.Exit(1)
 		}
-		tui.OK("new version: " + v)
+		fmt.Println(next.String())
+	case "tag", "push":
+		v, err := versioning.Parse(args[1])
+		if err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
+		tag := "v" + v.String()
+		if err := createReleaseTag(tag); err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
+		if args[0] == "push" {
+			if err := gitRun("push", "origin", tag); err != nil {
+				tui.Err(err.Error())
+				os.Exit(1)
+			}
+		}
+		tui.OK("created " + tag)
 	default:
-		tui.Err("usage: kt release patch|minor|major | set <version>")
+		tui.Err("usage: kt release next <patch|minor|major> | tag <version> | push <version>")
 		os.Exit(2)
 	}
+}
+
+func latestReleaseVersion() (versioning.Version, error) {
+	out, err := gitOutput("for-each-ref", "--merged=HEAD", "--sort=-version:refname", "--format=%(refname:strip=2)", "refs/tags/v*")
+	if err != nil {
+		return versioning.Version{}, err
+	}
+	for _, tag := range strings.Fields(out) {
+		v, err := versioning.Parse(tag)
+		if err == nil {
+			return v, nil
+		}
+	}
+	return versioning.Version{}, fmt.Errorf("no semver release tag is reachable from HEAD")
+}
+
+func createReleaseTag(tag string) error {
+	dirty, err := gitOutput("status", "--porcelain")
+	if err != nil {
+		return err
+	}
+	if dirty != "" {
+		return fmt.Errorf("working tree must be clean before creating a release tag")
+	}
+	if err := gitRun("rev-parse", "--verify", "HEAD"); err != nil {
+		return fmt.Errorf("HEAD is not a commit: %w", err)
+	}
+	if err := gitRun("show-ref", "--verify", "--quiet", "refs/tags/"+tag); err == nil {
+		return fmt.Errorf("tag %s already exists locally", tag)
+	}
+	remote, err := gitOutput("ls-remote", "--tags", "origin", "refs/tags/"+tag)
+	if err != nil {
+		return fmt.Errorf("check remote tag: %w", err)
+	}
+	if strings.TrimSpace(remote) != "" {
+		return fmt.Errorf("tag %s already exists on origin", tag)
+	}
+	return gitRun("tag", "-a", tag, "-m", "Release "+tag)
+}
+
+func gitOutput(args ...string) (string, error) {
+	out, err := exec.Command("git", args...).Output()
+	if err != nil {
+		return "", fmt.Errorf("git %s: %w", strings.Join(args, " "), err)
+	}
+	return string(out), nil
+}
+
+func gitRun(args ...string) error {
+	cmd := exec.Command("git", args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 func cmdDoctor() { runMake("doctor") }
