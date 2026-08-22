@@ -11,11 +11,19 @@ Global flags may appear before the command or before a subcommand.
 | `--no-color` | Disable ANSI styling |
 | `--color auto\|always\|never` | Control styling |
 
-Unknown commands include a nearest-command suggestion when the typo is close enough.
+Unknown commands include a nearest-command suggestion when the typo is close enough. Use `kt help <topic>` for contextual help without expanding the top-level help page.
+
+```bash
+kt help init
+kt help config
+kt help deploy
+kt help release
+kt help completion
+```
 
 ## kt init
 
-Scaffold a new project from a template. Running without arguments starts an interactive prompt to choose a template, enter an app name, confirm the target directory, and fill package/service defaults.
+Scaffold a new project from a template. Running without arguments starts an interactive prompt to choose a template, enter a valid app name, confirm the target directory, and fill package/service defaults.
 
 ```bash
 kt init                                              # interactive
@@ -26,6 +34,7 @@ kt init <template> <app> [options]                   # explicit
 | --- | --- | --- |
 | `--dir` | `.` | Target directory |
 | `--force` | `false` | Overwrite existing files |
+| `--dry-run` | `false` | Print create/keep/overwrite actions without writing files |
 
 ```bash
 kt init service my-api
@@ -33,6 +42,7 @@ kt init cli my-tool
 kt init mixed my-suite
 kt init multi my-platform
 kt init cli my-tool --dir /srv/projects
+kt init service my-api --dry-run
 ```
 
 Package maintainer is derived from git config automatically. Service templates derive service user and group from the app name unless overridden in the interactive form.
@@ -44,6 +54,18 @@ List all available project templates.
 ```bash
 kt templates
 ```
+
+## kt completion
+
+Print shell completion snippets.
+
+```bash
+kt completion bash
+kt completion zsh
+kt completion fish
+```
+
+Load the printed snippet through your shell's normal completion mechanism.
 
 ## kt install-tools / kt update-tools
 
@@ -79,15 +101,18 @@ Use `--check` in CI to fail when local `.kt/mk/` differs from the embedded versi
 - `release`: release tag settings
 - `kt`: scaffold metadata
 
-Legacy comma-separated `services` plus top-level `user`/`group` still load, but new scaffolds write structured service entries with `name`, `role`, `runner`, `unit`, `user`, and `group`.
+Legacy comma-separated `services` plus top-level `user`/`group` still load. `kt config migrate --to kt.project/v1` rewrites an existing manifest into the structured format.
 
 ```bash
-kt config show              # print all top-level scalar keys and values
-kt config show --json       # print normalized project contract as JSON
-kt config shape             # print kind-aware summary from .kt/project.yaml
-kt config get <key>         # print a single value (used by Makefile: APP := $(shell kt config get app))
-kt config set <key> <value> # update a top-level scalar value in .kt/project.yaml
-kt config validate          # check app/kind/services/user/group consistency
+kt config show                  # print all top-level scalar keys and values
+kt config show --json           # print normalized project contract as JSON
+kt config shape                 # print kind-aware summary from .kt/project.yaml
+kt config get <key>             # print a single value
+kt config set <key> <value>     # update a top-level scalar value in .kt/project.yaml
+kt config validate              # check app/kind/services/user/group consistency
+kt config edit                  # open $VISUAL/$EDITOR on .kt/project.yaml, then validate
+kt config schema                # print a JSON schema for kt.project/v1
+kt config migrate --to kt.project/v1
 ```
 
 ### Deploy config
@@ -107,11 +132,13 @@ Inspect and validate generated deploy files against `.kt/project.yaml`.
 ```bash
 kt deploy inspect
 kt deploy inspect --json
+kt deploy metadata --json
+kt deploy metadata --json --output dist/app/meta/deploy.json
 kt deploy check
 kt deploy check --json
 ```
 
-`inspect --json` emits deploy metadata including structured services, config/data/log directories, packaged unit names, and installed runner paths. The generated `make build-metadata` target writes the same data to `dist/app/meta/deploy.json`.
+`inspect --json` emits deploy metadata including structured services, config/data/log directories, packaged unit names, and installed runner paths. `metadata` emits the same JSON-only contract and can write it directly to a file. The generated `make build-metadata` target writes the data to `dist/app/meta/deploy.json`.
 
 `check` verifies the project manifest, `nfpm.yaml`, deploy config examples, service runners, systemd units, expected `ExecStart` paths, executable bits, and stale lifecycle scripts.
 

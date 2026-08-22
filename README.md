@@ -67,6 +67,19 @@ It is **not** a deployment framework — it sets up the structure, then normal L
 kt templates   # list all available templates
 ```
 
+## 1.4 changes
+
+`1.4.0` expands the project tooling contract without changing the generated runtime model:
+
+- `kt help <topic>` keeps top-level help short while documenting subcommands
+- `kt init --dry-run` shows create/keep/overwrite actions before writing
+- new scaffolds use structured `package`, `services`, `commands`, `config`, `release`, and `kt` manifest fields
+- `kt config schema`, `kt config edit`, and `kt config migrate --to kt.project/v1` support structured manifest adoption
+- `kt deploy metadata --json` emits the JSON contract written to `dist/app/meta/deploy.json`
+- `kt completion bash|zsh|fish` prints shell completion snippets
+
+If you are upgrading an existing project, read [Commands](docs/commands.md) and run `kt config migrate --to kt.project/v1` when you are ready to rewrite `.kt/project.yaml`.
+
 ## 1.3 changes
 
 `1.3.0` changes the public scaffold model in a few important ways:

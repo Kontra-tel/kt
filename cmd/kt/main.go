@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"git.kontra.tel/kontra.tel/Kt/internal/assets"
@@ -38,6 +39,8 @@ func main() {
 		cmdInit(s, args[1:])
 	case "templates":
 		cmdTemplates(s)
+	case "completion":
+		cmdCompletion(args[1:])
 	case "install-tools":
 		cmdInstallTools(s, args[1:], false)
 	case "update-tools":
@@ -55,9 +58,9 @@ func main() {
 	case "version":
 		cmdVersion()
 	case "help", "--help", "-h":
-		usage()
+		usageTopic(args[1:])
 	default:
-		suggestion := suggest(args[0], []string{"init", "templates", "install-tools", "update-tools", "config", "deploy", "release", "doctor", "update", "version", "help"})
+		suggestion := suggest(args[0], rootCommands())
 		if suggestion != "" {
 			tui.Err("unknown command: " + args[0] + " (did you mean " + suggestion + "?)")
 		} else {
@@ -106,13 +109,13 @@ func usage() {
 
 	tui.Header("Usage")
 	fmt.Println("  kt [global flags] <command> [arguments]")
-	fmt.Println("  kt help")
+	fmt.Println("  kt help [topic]")
 
 	tui.Header("Commands")
 	tui.Table([]string{"group", "commands"}, [][]string{
 		{"project", "init, templates, config, deploy"},
 		{"release", "release next|plan|notes|validate|tag|push"},
-		{"tooling", "install-tools, update-tools, update, doctor, version"},
+		{"tooling", "install-tools, update-tools, completion, update, doctor, version"},
 	})
 
 	tui.Header("Global flags")
@@ -123,7 +126,51 @@ func usage() {
 		{"--color auto|always|never", "control styling"},
 	})
 
-	fmt.Println("  details: man kt or docs/commands.md")
+	fmt.Println("  details: kt help <topic>, man kt, or docs/commands.md")
+}
+
+func usageTopic(args []string) {
+	if len(args) == 0 {
+		usage()
+		return
+	}
+	switch args[0] {
+	case "init":
+		tui.Header("kt init")
+		fmt.Println("  kt init [template] [app] [--dir DIR] [--force] [--dry-run]")
+		fmt.Println("  interactive when template or app is omitted")
+	case "config":
+		tui.Header("kt config")
+		fmt.Println("  kt config get <key> | set <key> <value> | show [--json] | shape | validate")
+		fmt.Println("  kt config edit | schema | migrate --to kt.project/v1")
+		fmt.Println("  kt config init | diff | check")
+	case "deploy":
+		tui.Header("kt deploy")
+		fmt.Println("  kt deploy inspect [--json]")
+		fmt.Println("  kt deploy metadata [--json] [--output FILE]")
+		fmt.Println("  kt deploy check [--json]")
+	case "release":
+		tui.Header("kt release")
+		fmt.Println("  kt release next <patch|minor|major|pre|stable> [--pre rc]")
+		fmt.Println("  kt release plan <kind|version> [--pre rc] [--json]")
+		fmt.Println("  kt release notes [range|--since latest]")
+		fmt.Println("  kt release validate <vversion> [--github-output]")
+		fmt.Println("  kt release tag|push <version>")
+	case "completion":
+		tui.Header("kt completion")
+		fmt.Println("  kt completion bash|zsh|fish")
+	case "tools", "install-tools", "update-tools":
+		tui.Header("kt tooling")
+		fmt.Println("  kt install-tools [--dir .] [--force] [--check|--diff] [--apply]")
+		fmt.Println("  kt update-tools [--dir .] [--force] [--check|--diff] [--apply]")
+	default:
+		tui.Err("unknown help topic: " + args[0])
+		os.Exit(2)
+	}
+}
+
+func rootCommands() []string {
+	return []string{"init", "templates", "install-tools", "update-tools", "config", "deploy", "release", "completion", "doctor", "update", "version", "help"}
 }
 
 func cmdInit(s scaffold.Scaffolder, args []string) {
@@ -131,6 +178,7 @@ func cmdInit(s scaffold.Scaffolder, args []string) {
 	dir := "."
 	dirSet := false
 	force := false
+	dryRun := false
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch a {
@@ -142,6 +190,11 @@ func cmdInit(s scaffold.Scaffolder, args []string) {
 			}
 		case "--force":
 			force = true
+		case "--dry-run":
+			dryRun = true
+		case "help", "--help", "-h":
+			usageTopic([]string{"init"})
+			return
 		default:
 			positional = append(positional, a)
 		}
@@ -156,6 +209,10 @@ func cmdInit(s scaffold.Scaffolder, args []string) {
 		if !dirSet {
 			dir = tui.Input("Target directory", dir)
 		}
+	}
+	if !validTemplate(s, tmplName) {
+		tui.Err("unknown template: " + tmplName)
+		os.Exit(1)
 	}
 	if !ktconfig.SafeName(appName) {
 		tui.Err("app name must match [a-z0-9][a-z0-9-]*")
@@ -178,6 +235,14 @@ func cmdInit(s scaffold.Scaffolder, args []string) {
 			{"service user", ctx.ServiceUser},
 			{"service group", ctx.ServiceGroup},
 		})
+	}
+
+	if dryRun {
+		if err := dryRunInit(s, dir, ctx, force); err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
+		return
 	}
 
 	tui.Header("Initializing " + ctx.App)
@@ -218,10 +283,12 @@ func promptInit(s scaffold.Scaffolder, positional []string) (tmplName, appName s
 	if len(positional) >= 2 {
 		appName = positional[1]
 	} else {
-		appName = tui.Input("App name", "")
-		for appName == "" {
-			tui.Err("app name is required")
+		for {
 			appName = tui.Input("App name", "")
+			if ktconfig.SafeName(appName) {
+				break
+			}
+			tui.Err("app name must match [a-z0-9][a-z0-9-]*")
 		}
 	}
 	return
@@ -239,6 +306,27 @@ func cmdTemplates(s scaffold.Scaffolder) {
 		rows = append(rows, []string{t.Name, t.Desc})
 	}
 	tui.Table([]string{"template", "description"}, rows)
+}
+
+func cmdCompletion(args []string) {
+	if len(args) != 1 {
+		tui.Err("usage: kt completion bash|zsh|fish")
+		os.Exit(2)
+	}
+	commands := strings.Join(rootCommands(), " ")
+	switch args[0] {
+	case "bash":
+		fmt.Printf("_kt_complete() {\n  local cur=\"${COMP_WORDS[COMP_CWORD]}\"\n  COMPREPLY=( $(compgen -W %q -- \"$cur\") )\n}\ncomplete -F _kt_complete kt\n", commands)
+	case "zsh":
+		fmt.Printf("#compdef kt\n_arguments '1:command:(%s)'\n", commands)
+	case "fish":
+		for _, command := range rootCommands() {
+			fmt.Printf("complete -c kt -f -a %s\n", command)
+		}
+	default:
+		tui.Err("usage: kt completion bash|zsh|fish")
+		os.Exit(2)
+	}
 }
 
 func cmdInstallTools(s scaffold.Scaffolder, args []string, update bool) {
@@ -337,12 +425,70 @@ func defaultMaintainer() string {
 	return n
 }
 
+func validTemplate(s scaffold.Scaffolder, name string) bool {
+	templates, err := s.Templates()
+	if err != nil {
+		return false
+	}
+	for _, template := range templates {
+		if template == name {
+			return true
+		}
+	}
+	return false
+}
+
+func dryRunInit(s scaffold.Scaffolder, dir string, ctx scaffold.Context, force bool) error {
+	tmp, err := os.MkdirTemp("", "kt-init-dry-run-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmp)
+	if err := s.Init(tmp, ctx, true); err != nil {
+		return err
+	}
+	var rows [][]string
+	err = filepath.WalkDir(tmp, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		rel, err := filepath.Rel(tmp, path)
+		if err != nil {
+			return err
+		}
+		action := "create"
+		if _, err := os.Stat(filepath.Join(dir, rel)); err == nil {
+			if force {
+				action = "overwrite"
+			} else {
+				action = "keep"
+			}
+		}
+		rows = append(rows, []string{action, rel})
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i][0] == rows[j][0] {
+			return rows[i][1] < rows[j][1]
+		}
+		return rows[i][0] < rows[j][0]
+	})
+	tui.Header("Init dry run")
+	tui.Table([]string{"action", "path"}, rows)
+	return nil
+}
+
 func cmdConfig(args []string) {
 	if len(args) < 1 {
-		tui.Err("usage: kt config get <key> | set <key> <value> | show [--json] | shape | validate | init|diff|check")
+		tui.Err("usage: kt config get <key> | set <key> <value> | show [--json] | shape | validate | edit | schema | migrate --to kt.project/v1 | init|diff|check")
 		os.Exit(2)
 	}
 	switch args[0] {
+	case "help", "--help", "-h":
+		usageTopic([]string{"config"})
 	case "get":
 		if len(args) < 2 {
 			tui.Err("usage: kt config get <key>")
@@ -371,22 +517,7 @@ func cmdConfig(args []string) {
 				tui.Err(err.Error())
 				os.Exit(1)
 			}
-			out := map[string]any{
-				"schema":          project.Schema,
-				"template":        project.Template,
-				"app":             project.App,
-				"kind":            project.Kind,
-				"services":        project.ServicesList(),
-				"service_details": project.ServiceDetails(),
-				"commands":        project.Commands,
-				"package":         project.Package,
-				"config":          project.Config,
-				"release":         project.Release,
-				"kt":              project.KT,
-				"user":            project.User,
-				"group":           project.Group,
-			}
-			writeJSON(out)
+			writeJSON(projectJSON(project))
 			return
 		}
 		pairs, err := ktconfig.All()
@@ -438,18 +569,224 @@ func cmdConfig(args []string) {
 			tui.Err(issue)
 		}
 		os.Exit(1)
+	case "edit":
+		if err := editProjectConfig(); err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
+	case "schema":
+		writeJSON(projectSchema())
+	case "migrate":
+		if len(args) != 3 || args[1] != "--to" || args[2] != "kt.project/v1" {
+			tui.Err("usage: kt config migrate --to kt.project/v1")
+			os.Exit(2)
+		}
+		if err := migrateProjectConfig(); err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
 	default:
 		runMake("config-" + args[0])
 	}
 }
 
+func projectJSON(project ktconfig.Project) map[string]any {
+	return map[string]any{
+		"schema":          project.Schema,
+		"template":        project.Template,
+		"app":             project.App,
+		"kind":            project.Kind,
+		"services":        project.ServicesList(),
+		"service_details": project.ServiceDetails(),
+		"commands":        project.Commands,
+		"package":         project.Package,
+		"config":          project.Config,
+		"release":         project.Release,
+		"kt":              project.KT,
+		"user":            project.User,
+		"group":           project.Group,
+	}
+}
+
+func editProjectConfig() error {
+	editor := os.Getenv("VISUAL")
+	if editor == "" {
+		editor = os.Getenv("EDITOR")
+	}
+	if editor == "" {
+		editor = "vi"
+	}
+	cmd := exec.Command("sh", "-c", editor+" "+shellQuote(filepath.Join(".kt", "project.yaml")))
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+	project, err := ktconfig.Load()
+	if err != nil {
+		return err
+	}
+	issues := ktconfig.Validate(project)
+	if len(issues) > 0 {
+		return fmt.Errorf("project manifest has issues after edit: %s", strings.Join(issues, "; "))
+	}
+	tui.OK("project manifest is valid")
+	return nil
+}
+
+func projectSchema() map[string]any {
+	return map[string]any{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"title":   "kt.project/v1",
+		"type":    "object",
+		"required": []string{
+			"schema", "template", "app", "kind",
+		},
+		"properties": map[string]any{
+			"schema":   map[string]any{"const": "kt.project/v1"},
+			"template": map[string]any{"type": "string"},
+			"app":      map[string]any{"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+			"kind":     map[string]any{"enum": []string{"cli", "service", "mixed", "multi-service"}},
+			"package":  map[string]any{"type": "object"},
+			"services": map[string]any{"type": "array", "items": map[string]any{"type": "object"}},
+			"commands": map[string]any{"type": "array", "items": map[string]any{"type": "object"}},
+			"config":   map[string]any{"type": "object"},
+			"release":  map[string]any{"type": "object"},
+			"kt":       map[string]any{"type": "object"},
+		},
+	}
+}
+
+func migrateProjectConfig() error {
+	project, err := ktconfig.Load()
+	if err != nil {
+		return err
+	}
+	content := renderProjectYAML(project)
+	if err := os.WriteFile(filepath.Join(".kt", "project.yaml"), []byte(content), 0644); err != nil {
+		return err
+	}
+	tui.OK("migrated .kt/project.yaml to kt.project/v1")
+	return nil
+}
+
+func renderProjectYAML(project ktconfig.Project) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Project contract used by kt, Make, and packaging.\n")
+	fmt.Fprintf(&b, "# Safe to edit after scaffold.\n")
+	fmt.Fprintf(&b, "schema: kt.project/v1\n")
+	fmt.Fprintf(&b, "template: %s\n", project.Template)
+	fmt.Fprintf(&b, "app: %s\n", project.App)
+	fmt.Fprintf(&b, "kind: %s\n", project.Kind)
+	fmt.Fprintf(&b, "package:\n")
+	fmt.Fprintf(&b, "  name: %s\n", nonEmpty(project.Package.Name, project.App))
+	if project.Package.Maintainer != "" {
+		fmt.Fprintf(&b, "  maintainer: %s\n", project.Package.Maintainer)
+	}
+	if project.Package.Description != "" {
+		fmt.Fprintf(&b, "  description: %s\n", project.Package.Description)
+	}
+	if project.Package.Section != "" {
+		fmt.Fprintf(&b, "  section: %s\n", project.Package.Section)
+	}
+	if project.Package.License != "" {
+		fmt.Fprintf(&b, "  license: %s\n", project.Package.License)
+	}
+	services := project.ServiceDetails()
+	if len(services) == 0 {
+		fmt.Fprintf(&b, "services: []\n")
+	} else {
+		fmt.Fprintf(&b, "services:\n")
+		for _, service := range services {
+			service = serviceWithDefaults(project, service)
+			fmt.Fprintf(&b, "  - name: %s\n", service.Name)
+			if service.Role != "" {
+				fmt.Fprintf(&b, "    role: %s\n", service.Role)
+			}
+			if service.Runner != "" {
+				fmt.Fprintf(&b, "    runner: %s\n", service.Runner)
+			}
+			if service.Unit != "" {
+				fmt.Fprintf(&b, "    unit: %s\n", service.Unit)
+			}
+			if service.User != "" {
+				fmt.Fprintf(&b, "    user: %s\n", service.User)
+			}
+			if service.Group != "" {
+				fmt.Fprintf(&b, "    group: %s\n", service.Group)
+			}
+		}
+	}
+	commands := project.Commands
+	if len(commands) == 0 && project.App != "" {
+		commands = []ktconfig.Command{{Name: project.App, Path: "deploy/bin/" + project.App}}
+		if project.Kind == "mixed" {
+			commands = append(commands, ktconfig.Command{Name: project.App + "-service", Path: "deploy/bin/" + project.App + "-service"})
+		}
+	}
+	if len(commands) > 0 {
+		fmt.Fprintf(&b, "commands:\n")
+		for _, command := range commands {
+			fmt.Fprintf(&b, "  - name: %s\n", command.Name)
+			fmt.Fprintf(&b, "    path: %s\n", command.Path)
+		}
+	}
+	fmt.Fprintf(&b, "config:\n")
+	fmt.Fprintf(&b, "  dir: %s\n", project.Config.Dir)
+	fmt.Fprintf(&b, "  install_dir: %s\n", project.Config.InstallDir)
+	fmt.Fprintf(&b, "  example_suffix: %s\n", project.Config.ExampleSuffix)
+	fmt.Fprintf(&b, "release:\n")
+	fmt.Fprintf(&b, "  tag_prefix: %s\n", project.Release.TagPrefix)
+	fmt.Fprintf(&b, "kt:\n")
+	fmt.Fprintf(&b, "  scaffold_version: \"%s\"\n", project.KT.ScaffoldVersion)
+	return b.String()
+}
+
+func nonEmpty(value, fallback string) string {
+	if value != "" {
+		return value
+	}
+	return fallback
+}
+
+func hasArg(args []string, want string) bool {
+	for _, arg := range args {
+		if arg == want {
+			return true
+		}
+	}
+	return false
+}
+
+func serviceWithDefaults(project ktconfig.Project, service ktconfig.Service) ktconfig.Service {
+	if service.Runner == "" && service.Name != "" {
+		service.Runner = filepath.Join("deploy", "run", service.Name)
+	}
+	if service.Unit == "" && service.Name != "" {
+		service.Unit = filepath.Join("deploy", "systemd", service.Name+".service")
+	}
+	if service.User == "" {
+		service.User = project.User
+	}
+	if service.Group == "" {
+		service.Group = project.Group
+	}
+	return service
+}
+
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+}
 func cmdDeploy(args []string) {
 	if len(args) < 1 {
-		tui.Err("usage: kt deploy inspect [--json] | check [--json]")
+		tui.Err("usage: kt deploy inspect [--json] | metadata [--json] [--output FILE] | check [--json]")
 		os.Exit(2)
 	}
-	jsonOut := globalJSON || (len(args) > 1 && args[1] == "--json")
+	jsonOut := globalJSON || hasArg(args[1:], "--json")
 	switch args[0] {
+	case "help", "--help", "-h":
+		usageTopic([]string{"deploy"})
 	case "inspect":
 		info, err := deploycheck.Inspect(".")
 		if err != nil {
@@ -469,6 +806,43 @@ func cmdDeploy(args []string) {
 			{"data", info.DataDir},
 			{"logs", info.LogDir},
 		})
+	case "metadata":
+		info, err := deploycheck.Inspect(".")
+		if err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
+		output := ""
+		for i := 1; i < len(args); i++ {
+			switch args[i] {
+			case "--json":
+			case "--output":
+				i++
+				if i >= len(args) {
+					tui.Err("--output requires a file")
+					os.Exit(2)
+				}
+				output = args[i]
+			default:
+				tui.Err("usage: kt deploy metadata [--json] [--output FILE]")
+				os.Exit(2)
+			}
+		}
+		data, err := json.MarshalIndent(info, "", "  ")
+		if err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
+		data = append(data, '\n')
+		if output != "" {
+			if err := os.WriteFile(output, data, 0644); err != nil {
+				tui.Err(err.Error())
+				os.Exit(1)
+			}
+			tui.OK("wrote " + output)
+			return
+		}
+		fmt.Print(string(data))
 	case "check":
 		checks, err := deploycheck.CheckProject(".")
 		if err != nil {
@@ -504,7 +878,7 @@ func cmdDeploy(args []string) {
 			os.Exit(1)
 		}
 	default:
-		tui.Err("usage: kt deploy inspect [--json] | check [--json]")
+		tui.Err("usage: kt deploy inspect [--json] | metadata [--json] [--output FILE] | check [--json]")
 		os.Exit(2)
 	}
 }
@@ -521,6 +895,10 @@ func cmdRelease(args []string) {
 	if len(args) < 1 {
 		releaseUsage()
 		os.Exit(2)
+	}
+	if args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
+		usageTopic([]string{"release"})
+		return
 	}
 	switch args[0] {
 	case "next":

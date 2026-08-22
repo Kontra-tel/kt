@@ -69,7 +69,7 @@ This split keeps service packages safe to inspect manually while giving the serv
 | `dist/app/meta/build.json` | Build version, commit, source shape, host, OS, and arch |
 | `dist/app/meta/deploy.json` | App kind, structured services, config/data/log dirs, packaged unit names, and installed runner paths |
 
-`kt deploy inspect --json` emits the same deploy contract used for `deploy.json`.
+`kt deploy metadata --json` emits the same deploy contract used for `deploy.json`.
 
 ## Deploy layout
 

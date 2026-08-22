@@ -49,7 +49,7 @@ env-print: ## Print resolved variables
 build-metadata: ## Write packaged build and deploy metadata under dist/app/meta
 	@mkdir -p "$(BUILD_METADATA_DIR)"
 	@APP="$(APP)" VERSION="$(VERSION)" BUILD_COMMIT="$(BUILD_COMMIT)" BUILD_FULL_COMMIT="$(BUILD_FULL_COMMIT)" BUILD_BRANCH="$(BUILD_BRANCH)" BUILD_DATE="$(BUILD_DATE)" BUILD_DIRTY="$(BUILD_DIRTY)" PROJECT_TEMPLATE="$(PROJECT_TEMPLATE)" PROJECT_KIND="$(PROJECT_KIND)" PROJECT_SERVICES="$(PROJECT_SERVICES)" PROJECT_USER="$(PROJECT_USER)" PROJECT_GROUP="$(PROJECT_GROUP)" BUILD_HOST="$(BUILD_HOST)" BUILD_OS="$(BUILD_OS)" BUILD_ARCH="$(BUILD_ARCH)" BUILD_METADATA_FILE="$(BUILD_METADATA_FILE)" python3 -c 'import json, os, pathlib; path = pathlib.Path(os.environ["BUILD_METADATA_FILE"]); services = [s.strip() for s in os.environ["PROJECT_SERVICES"].split(",") if s.strip()]; payload = {"app": os.environ["APP"], "version": os.environ["VERSION"], "template": os.environ["PROJECT_TEMPLATE"], "kind": os.environ["PROJECT_KIND"], "services": services, "user": os.environ["PROJECT_USER"], "group": os.environ["PROJECT_GROUP"], "commit": os.environ["BUILD_COMMIT"], "full_commit": os.environ["BUILD_FULL_COMMIT"], "branch": os.environ["BUILD_BRANCH"], "date": os.environ["BUILD_DATE"], "dirty": os.environ["BUILD_DIRTY"].lower() == "true", "host": os.environ["BUILD_HOST"], "os": os.environ["BUILD_OS"], "arch": os.environ["BUILD_ARCH"]}; path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")'
-	@kt deploy inspect --json > "$(DEPLOY_METADATA_FILE)"
+	@kt deploy metadata --json > "$(DEPLOY_METADATA_FILE)"
 
 clean: ## Remove build output
 	rm -rf $(DIST_DIR)

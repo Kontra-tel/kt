@@ -38,7 +38,7 @@ List available project templates.
 .B kt init
 Start an interactive scaffold prompt.
 .TP
-.B kt init \fItemplate\fR \fIapp\fR [\-\-dir \fIdir\fR] [\-\-force]
+.B kt init \fItemplate\fR \fIapp\fR [\-\-dir \fIdir\fR] [\-\-force] [\-\-dry-run]
 Create a project from a template. Supported templates are
 .BR service ,
 .BR cli ,
@@ -66,6 +66,26 @@ Print the normalized project shape.
 .B kt config validate
 Validate app name, kind, services, service paths, and service account fields.
 .TP
+.B kt config edit
+Open
+.IR .kt/project.yaml
+in
+.BR VISUAL ,
+.BR EDITOR ,
+or
+.BR vi ,
+then validate it.
+.TP
+.B kt config schema
+Print the
+.B kt.project/v1
+JSON schema.
+.TP
+.B kt config migrate \-\-to kt.project/v1
+Rewrite a legacy manifest into the structured
+.B kt.project/v1
+format.
+.TP
 .B kt config init|diff|check
 Delegate to the generated Make config targets for
 .IR deploy/config .
@@ -76,6 +96,9 @@ Print deploy metadata derived from
 .IR .kt/project.yaml ,
 including structured services, config/data/log directories, unit names, and
 installed runner paths.
+.TP
+.B kt deploy metadata [\-\-json] [\-\-output \fIfile\fR]
+Print deploy metadata as JSON, or write it to a file.
 .TP
 .B kt deploy check [\-\-json]
 Validate the project manifest, package manifest, config examples, service
@@ -148,6 +171,9 @@ Run generated project doctor checks.
 .TP
 .B kt version
 Print kt version, commit, and build date.
+.TP
+.B kt completion bash|zsh|fish
+Print shell completion snippets.
 .SH PROJECT MANIFEST
 Every scaffold writes
 .IR .kt/project.yaml .
@@ -181,8 +207,7 @@ Build metadata written by
 Deploy metadata written by
 .BR make build-metadata ,
 matching
-.BR kt deploy inspect --json .
-.SH FILES
+.BR kt deploy metadata --json .
 .TP
 .I .kt/project.yaml
 Project contract used by kt, Make, and packaging.
@@ -211,8 +236,8 @@ Install script binary destination. Defaults to
 .EX
 kt init service my-api
 kt --json deploy inspect
-kt templates
-kt config validate
+kt deploy metadata --json
+kt config migrate --to kt.project/v1
 kt deploy check
 kt release notes --since latest
 kt release plan minor
