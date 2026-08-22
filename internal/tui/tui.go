@@ -2,6 +2,7 @@ package tui
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -149,13 +150,17 @@ func Select(label string, options []string) int {
 		for i, o := range options {
 			huhOptions[i] = huh.NewOption(stripANSI(o), i)
 		}
-		if err := huh.NewSelect[int]().
+		err := huh.NewSelect[int]().
 			Title(label).
 			Options(huhOptions...).
 			Value(&choice).
 			WithTheme(huh.ThemeCharm()).
-			Run(); err == nil {
+			Run()
+		if err == nil {
 			return choice
+		}
+		if errors.Is(err, huh.ErrUserAborted) {
+			cancel()
 		}
 	}
 
@@ -190,11 +195,15 @@ func Input(prompt, def string) string {
 		if def != "" {
 			field.Placeholder(def)
 		}
-		if err := field.WithTheme(huh.ThemeCharm()).Run(); err == nil {
+		err := field.WithTheme(huh.ThemeCharm()).Run()
+		if err == nil {
 			if s := strings.TrimSpace(value); s != "" {
 				return s
 			}
 			return def
+		}
+		if errors.Is(err, huh.ErrUserAborted) {
+			cancel()
 		}
 	}
 
@@ -210,6 +219,11 @@ func Input(prompt, def string) string {
 		}
 	}
 	return def
+}
+
+func cancel() {
+	fmt.Fprintln(os.Stderr, "cancelled")
+	os.Exit(130)
 }
 
 func interactiveTerminal() bool {
