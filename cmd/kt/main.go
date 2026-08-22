@@ -102,7 +102,18 @@ func parseGlobalArgs(args []string) []string {
 }
 
 func usage() {
-	tui.Title("kt", "project scaffolding for Make, nFPM, systemd, and tag-based releases")
+	tui.Title("kt", "scaffold Make, nFPM, systemd, and tag-based releases")
+
+	tui.Header("Usage")
+	fmt.Println("  kt [global flags] <command> [arguments]")
+	fmt.Println("  kt help")
+
+	tui.Header("Commands")
+	tui.Table([]string{"group", "commands"}, [][]string{
+		{"project", "init, templates, config, deploy"},
+		{"release", "release next|plan|notes|validate|tag|push"},
+		{"tooling", "install-tools, update-tools, update, doctor, version"},
+	})
 
 	tui.Header("Global flags")
 	tui.Table([]string{"flag", "description"}, [][]string{
@@ -111,38 +122,8 @@ func usage() {
 		{"--no-color", "disable styling"},
 		{"--color auto|always|never", "control styling"},
 	})
-	tui.Header("Project")
-	tui.Table([]string{"command", "description"}, [][]string{
-		{"kt init <template> <app> [--dir .] [--force]", "create a new project"},
-		{"kt templates", "list scaffold templates"},
-		{"kt config get|set|show|shape|validate", "inspect and validate .kt/project.yaml"},
-		{"kt config init|diff|check", "manage deploy/config examples"},
-		{"kt deploy inspect [--json]", "show deploy metadata"},
-		{"kt deploy check [--json]", "validate deploy files"},
-	})
 
-	tui.Header("Release")
-	tui.Table([]string{"command", "description"}, [][]string{
-		{"kt release next <patch|minor|major|pre|stable> [--pre rc]", "print next version"},
-		{"kt release plan <kind|version> [--pre rc] [--json]", "preview tag, dirty state, conflicts"},
-		{"kt release validate <vversion> [--github-output]", "validate CI release tag"},
-		{"kt release notes [range|--since latest]", "print bullet release notes from git log"},
-		{"kt release tag|push <version>", "create immutable annotated tag"},
-	})
-
-	tui.Header("Tooling")
-	tui.Table([]string{"command", "description"}, [][]string{
-		{"kt install-tools [--dir .] [--force] [--check|--diff] [--apply]", "install or inspect .kt/mk helpers"},
-		{"kt update-tools [--dir .] [--force] [--check|--diff] [--apply]", "refresh or inspect .kt/mk helpers"},
-		{"kt update [--check] [--prerelease]", "update kt itself"},
-		{"kt doctor", "run project doctor checks"},
-		{"kt version", "print build metadata"},
-	})
-
-	tui.Header("Examples")
-	fmt.Println("  kt init service my-api")
-	fmt.Println("  kt release plan minor")
-	fmt.Println("  kt deploy check")
+	fmt.Println("  details: man kt or docs/commands.md")
 }
 
 func cmdInit(s scaffold.Scaffolder, args []string) {
