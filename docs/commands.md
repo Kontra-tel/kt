@@ -101,7 +101,7 @@ Use `--check` in CI to fail when local `.kt/mk/` differs from the embedded versi
 - `release`: release tag settings
 - `kt`: scaffold metadata
 
-Legacy comma-separated `services` plus top-level `user`/`group` still load. `kt config migrate --to kt.project/v1` rewrites an existing manifest into the structured format.
+Legacy comma-separated `services` plus top-level `user`/`group` still load. `kt config migrate --to kt.project/v1` rewrites an existing manifest into the structured format; see [1.4 migration](migration-1.4.md) for the recommended upgrade sequence.
 
 ```bash
 kt config show                  # print all top-level scalar keys and values

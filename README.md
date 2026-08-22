@@ -78,7 +78,7 @@ kt templates   # list all available templates
 - `kt deploy metadata --json` emits the JSON contract written to `dist/app/meta/deploy.json`
 - `kt completion bash|zsh|fish` prints shell completion snippets
 
-If you are upgrading an existing project, read [Commands](docs/commands.md) and run `kt config migrate --to kt.project/v1` when you are ready to rewrite `.kt/project.yaml`.
+If you are upgrading an existing project, read [1.4 migration](docs/migration-1.4.md) and run `kt config migrate --to kt.project/v1` when you are ready to rewrite `.kt/project.yaml`.
 
 ## 1.3 changes
 
@@ -106,6 +106,7 @@ kt update --prerelease
 - Manual page: `man kt` after package or `make install`
 - [Templates](docs/templates.md)
 - [Packaging](docs/packaging.md)
+- [1.4 migration](docs/migration-1.4.md)
 - [1.3 migration](docs/migration-1.3.md)
 - [Filesystem layout migration](docs/migration-fhs.md)
 - [Release & maintenance](docs/release.md)
