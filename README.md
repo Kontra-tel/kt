@@ -90,6 +90,7 @@ kt update --prerelease
 ## Documentation
 
 - [Commands](docs/commands.md)
+- Manual page: `man kt` after package or `make install`
 - [Templates](docs/templates.md)
 - [Packaging](docs/packaging.md)
 - [1.3 migration](docs/migration-1.3.md)

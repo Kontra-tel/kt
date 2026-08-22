@@ -1,0 +1,177 @@
+.TH KT 1 "2026-08-22" "kt 1.4" "User Commands"
+.SH NAME
+kt \- scaffold Make, nFPM, systemd, and tag-based release projects
+.SH SYNOPSIS
+.B kt
+.I command
+.RI [ arguments ]
+.SH DESCRIPTION
+.B kt
+is a small project scaffolding tool for applications packaged with Make, nFPM,
+and systemd. It creates project templates, maintains the local
+.I .kt/project.yaml
+manifest, validates deploy files, and manages tag-based releases.
+.PP
+The generated projects deliberately stay boring: Make builds, nFPM packages,
+systemd runs services, and external deployment automation decides when to
+install, migrate, restart, and roll back.
+.SH COMMANDS
+.SS Project commands
+.TP
+.B kt templates
+List available project templates.
+.TP
+.B kt init
+Start an interactive scaffold prompt.
+.TP
+.B kt init \fItemplate\fR \fIapp\fR [\-\-dir \fIdir\fR] [\-\-force]
+Create a project from a template. Supported templates are
+.BR service ,
+.BR cli ,
+.BR mixed ,
+.BR multi ,
+and legacy
+.BR app .
+.TP
+.B kt config get \fIkey\fR
+Print one value from
+.IR .kt/project.yaml .
+.TP
+.B kt config set \fIkey\fR \fIvalue\fR
+Update or append a value in
+.IR .kt/project.yaml .
+.TP
+.B kt config show [\-\-json]
+Print the project manifest. With
+.BR \-\-json ,
+prints the normalized contract as JSON.
+.TP
+.B kt config shape
+Print the normalized project shape.
+.TP
+.B kt config validate
+Validate app name, kind, services, and service account fields.
+.TP
+.B kt config init|diff|check
+Delegate to the generated Make config targets for
+.IR deploy/config .
+.SS Deploy commands
+.TP
+.B kt deploy inspect [\-\-json]
+Print deploy metadata derived from
+.IR .kt/project.yaml .
+.TP
+.B kt deploy check [\-\-json]
+Validate the project manifest, package manifest, config examples, service
+runners, systemd units, unit entrypoints, executable bits, and stale lifecycle
+scripts.
+.SS Release commands
+.TP
+.B kt release next patch|minor|major [\-\-pre \fIlabel\fR]
+Print the next stable version, or the first prerelease when
+.B \-\-pre
+is supplied.
+.TP
+.B kt release next pre
+Increment the current prerelease number.
+.TP
+.B kt release next stable
+Promote the current prerelease to a stable version.
+.TP
+.B kt release plan patch|minor|major|\fIversion\fR [\-\-pre \fIlabel\fR] [\-\-json]
+Preview the current release, next version, tag, dirty state, and local/remote
+tag conflicts.
+.TP
+.B kt release validate \fIvversion\fR [\-\-github-output]
+Validate a strict
+.B v<semver>
+tag. With
+.BR \-\-github-output ,
+writes
+.B version
+and
+.B prerelease
+outputs for CI.
+.TP
+.B kt release tag \fIversion\fR
+Create an immutable annotated local tag at HEAD.
+.TP
+.B kt release push \fIversion\fR
+Create and push an immutable annotated tag to
+.BR origin .
+.SS Tooling commands
+.TP
+.B kt install-tools [\-\-dir \fIdir\fR] [\-\-force]
+Install shared
+.I .kt/mk
+tooling into an existing project.
+.TP
+.B kt update-tools [\-\-dir \fIdir\fR] [\-\-force]
+Refresh shared
+.I .kt/mk
+tooling. Updates overwrite by default.
+.TP
+.B kt update [\-\-check] [\-\-prerelease]
+Update the
+.B kt
+binary from Gitea releases. Downloads are verified against
+.BR SHA256SUMS .
+.TP
+.B kt doctor
+Run generated project doctor checks.
+.TP
+.B kt version
+Print kt version, commit, and build date.
+.SH PROJECT MANIFEST
+Every scaffold writes
+.IR .kt/project.yaml .
+New scaffolds include
+.BR schema:
+.BR kt.project/v1 .
+Key fields are
+.BR template ,
+.BR app ,
+.BR kind ,
+.BR services ,
+.BR user ,
+and
+.BR group .
+.SH FILES
+.TP
+.I .kt/project.yaml
+Project contract used by kt, Make, and packaging.
+.TP
+.I .kt/mk/
+Shared generated Make includes.
+.TP
+.I deploy/
+Generated deploy source tree: config examples, package hooks, systemd units,
+service runners, and user-facing commands.
+.TP
+.I nfpm.yaml
+nFPM package manifest.
+.SH ENVIRONMENT
+.TP
+.B KT_VERSION
+Install script override for an exact release version.
+.TP
+.B KT_PRERELEASE
+Install script opt-in for latest prerelease selection.
+.TP
+.B BIN_DIR
+Install script binary destination. Defaults to
+.IR /usr/local/bin .
+.SH EXAMPLES
+.EX
+kt init service my-api
+kt templates
+kt config validate
+kt deploy check
+kt release plan minor
+kt release next minor --pre rc
+kt release push 1.4.0
+.EE
+.SH SEE ALSO
+.BR make (1),
+.BR systemd.service (5),
+.BR nfpm (1)

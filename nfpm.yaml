@@ -13,6 +13,10 @@ contents:
     dst: /usr/local/bin/kt
     file_info:
       mode: 0755
+  - src: docs/man/kt.1
+    dst: /usr/share/man/man1/kt.1
+    file_info:
+      mode: 0644
   - src: deploy/config/app.env.example
     dst: /etc/kt/app.env.example
     type: config|noreplace

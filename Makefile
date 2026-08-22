@@ -9,6 +9,7 @@ build:
 
 install: build
 	sudo install -m 755 kt /usr/local/bin/kt
+	sudo install -D -m 644 docs/man/kt.1 /usr/local/share/man/man1/kt.1
 
 test:
 	go test ./...
