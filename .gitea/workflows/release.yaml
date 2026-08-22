@@ -52,12 +52,7 @@ jobs:
         run: cd dist && sha256sum kt-* *.deb *.rpm > SHA256SUMS
 
       - name: Collect release notes
-        env:
-          SHA: ${{ github.sha }}
-        run: |
-          LAST=$(git describe --tags --abbrev=0 "${SHA}^" 2>/dev/null || echo "")
-          if [ -n "$LAST" ]; then BODY=$(git log --oneline "${LAST}..${SHA}" | sed 's/^/- /'); else BODY="Initial release."; fi
-          printf '%s\n' "$BODY" > /tmp/release-notes.txt
+        run: go run ./cmd/kt release notes --since latest > /tmp/release-notes.txt
 
       - name: Create or update release and upload assets
         env:

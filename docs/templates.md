@@ -12,8 +12,7 @@
 
 ## Project contract
 
-Every scaffold writes `.kt/project.yaml`. `kt`, Make, and nFPM treat it as the
-project contract.
+Every scaffold writes `.kt/project.yaml`. `kt`, Make, and nFPM treat it as the project contract.
 
 | Key | Meaning |
 | --- | --- |
@@ -21,23 +20,36 @@ project contract.
 | `template` | Template name as chosen by the user |
 | `app` | Package / application name |
 | `kind` | `cli`, `service`, `mixed`, or `multi-service` |
-| `services` | Comma-separated packaged service names, blank for `cli` |
-| `user` | Service user for service-bearing templates |
-| `group` | Service group for service-bearing templates |
+| `package` | Package name, maintainer, description, section, and optional license |
+| `services` | Structured list of packaged services; `[]` for `cli` |
+| `commands` | User-facing commands packaged under `/usr/bin` |
+| `config` | Config source directory, install directory, and example suffix |
+| `release` | Tag settings used by release commands |
+| `kt` | Scaffold metadata |
 
-Use `kt config show --json` or `kt config shape` to inspect the normalized
-contract from an existing project.
+A structured service entry may include:
 
-The generated `.kt/project.yaml` file also includes inline comments so users
-can see which fields are safe to customize after scaffold.
+| Service key | Meaning |
+| --- | --- |
+| `name` | Service name and default installed runner basename |
+| `role` | Optional role such as `backend`, `frontend`, or `service` |
+| `runner` | Repository path to the service runner script |
+| `unit` | Repository path to the systemd unit |
+| `user` | Service user |
+| `group` | Service group |
+
+Legacy comma-separated `services` plus top-level `user`/`group` still load for older projects. New scaffolds write structured `services` and keep `kt config get services` compatible by returning comma-separated names.
+
+Use `kt config show --json` or `kt config shape` to inspect the normalized contract from an existing project.
 
 Editing guidance:
 
 - `template`: keep this as the original scaffold family name
 - `app`: changing this later affects package paths, binary names, and service names
 - `kind`: do not change this unless you are deliberately reshaping the project
-- `services`: update this if you rename packaged service units
-- `user` / `group`: safe to customize for service-bearing templates
+- `services[].name`: update this if you rename packaged service units or runners
+- `services[].runner` / `services[].unit`: keep these aligned with files under `deploy/run/` and `deploy/systemd/`
+- `services[].user` / `services[].group`: safe to customize for service-bearing templates
 
 ## App shapes
 
@@ -46,8 +58,18 @@ Editing guidance:
 - `mixed`: `/usr/bin/<app>` is the runnable CLI, while `/usr/bin/<app>-service` prints service metadata and systemd runs `/usr/lib/<app>/bin/<app>-service`.
 - `multi`: `/usr/bin/<app>` prints package metadata, while systemd runs dedicated backend/frontend runners under `/usr/lib/<app>/bin/`.
 
-This split keeps service packages safe to inspect manually while giving the
-service manager a dedicated runtime entrypoint.
+This split keeps service packages safe to inspect manually while giving the service manager a dedicated runtime entrypoint.
+
+## Deploy metadata
+
+`make build-metadata` writes:
+
+| File | Purpose |
+| --- | --- |
+| `dist/app/meta/build.json` | Build version, commit, source shape, host, OS, and arch |
+| `dist/app/meta/deploy.json` | App kind, structured services, config/data/log dirs, packaged unit names, and installed runner paths |
+
+`kt deploy inspect --json` emits the same deploy contract used for `deploy.json`.
 
 ## Deploy layout
 
@@ -59,6 +81,7 @@ service manager a dedicated runtime entrypoint.
 | `deploy/config/*.example` | `/etc/<app>/` | Runtime config examples |
 | `dist/app/` | `/usr/lib/<app>/` | Application artifacts |
 | `dist/app/meta/build.json` | `/usr/lib/<app>/meta/build.json` | Generated build metadata |
+| `dist/app/meta/deploy.json` | `/usr/lib/<app>/meta/deploy.json` | Generated deploy metadata |
 
 ### `service`
 
@@ -73,6 +96,7 @@ service manager a dedicated runtime entrypoint.
 | `deploy/scripts/preremove.sh` | nFPM hook | Generic removal hook + optional local extension |
 | `dist/app/` | `/usr/lib/<app>/` | Application artifacts |
 | `dist/app/meta/build.json` | `/usr/lib/<app>/meta/build.json` | Generated build metadata |
+| `dist/app/meta/deploy.json` | `/usr/lib/<app>/meta/deploy.json` | Generated deploy metadata |
 
 ### `mixed`
 
@@ -88,6 +112,7 @@ service manager a dedicated runtime entrypoint.
 | `deploy/scripts/preremove.sh` | nFPM hook | Generic removal hook + optional local extension |
 | `dist/app/` | `/usr/lib/<app>/` | Application artifacts |
 | `dist/app/meta/build.json` | `/usr/lib/<app>/meta/build.json` | Generated build metadata |
+| `dist/app/meta/deploy.json` | `/usr/lib/<app>/meta/deploy.json` | Generated deploy metadata |
 
 ### `multi`
 
@@ -104,6 +129,7 @@ service manager a dedicated runtime entrypoint.
 | `deploy/scripts/preremove.sh` | nFPM hook | Generic removal hook + optional local extension |
 | `dist/app/` | `/usr/lib/<app>/` | Application artifacts |
 | `dist/app/meta/build.json` | `/usr/lib/<app>/meta/build.json` | Generated build metadata |
+| `dist/app/meta/deploy.json` | `/usr/lib/<app>/meta/deploy.json` | Generated deploy metadata |
 
 Service-bearing templates also create:
 
@@ -115,9 +141,7 @@ Service-bearing templates also create:
 
 ## Hook extensions
 
-Generated package hooks deliberately do not enable, restart, stop, or disable
-services. If an environment needs that behavior, copy the scaffolded examples
-from `deploy/hooks-examples/` to the target host:
+Generated package hooks deliberately do not enable, restart, stop, or disable services. If an environment needs that behavior, copy the scaffolded examples from `deploy/hooks-examples/` to the target host:
 
 ```text
 /etc/<app>/hooks/postinstall.local.sh

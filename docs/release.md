@@ -2,9 +2,7 @@
 
 ## Releasing kt
 
-Releases are driven by immutable annotated Git tags. Push a strict SemVer tag in
-the form `v<version>` and the `Release` workflow builds artifacts and creates
-the matching Gitea release.
+Releases are driven by immutable annotated Git tags. Push a strict SemVer tag in the form `v<version>` and the `Release` workflow builds artifacts and creates the matching Gitea release.
 
 ```bash
 kt release plan minor
@@ -14,10 +12,18 @@ kt release next stable
 kt release push 1.4.0
 ```
 
-The `plan` command previews the current reachable release, next version, tag,
-dirty state, and local/remote tag conflicts. The `push` command requires a clean
-working tree and refuses a version that is already tagged locally or on `origin`.
-It never changes source files.
+The `plan` command previews the current reachable release, next version, tag, dirty state, and local/remote tag conflicts. The `push` command requires a clean working tree and refuses a version that is already tagged locally or on `origin`. It never changes source files.
+
+### Release notes
+
+`kt release notes` prints Markdown bullets from `git log --oneline`.
+
+```bash
+kt release notes --since latest
+kt release notes v1.3.0..HEAD
+```
+
+With `--since latest`, kt finds the latest reachable tag before `HEAD` and logs that range. If no prior tag is reachable, it logs the available history. The release workflow uses this command when creating or updating the hosted release body.
 
 ### Prereleases
 
@@ -67,9 +73,7 @@ kt update --prerelease
 
 `kt update` downloads the matching binary for the current OS and architecture from Gitea, verifies it against `SHA256SUMS`, and atomically replaces the running executable. If the install location requires elevated permissions (e.g. `/usr/local/bin`) it re-runs automatically with `sudo`.
 
-By default, updates only install stable releases. Plain `kt update --check`
-still reports newer prereleases, but it does not opt into installing them. Use
-`kt update --prerelease` to install from the prerelease channel.
+By default, updates only install stable releases. Plain `kt update --check` still reports newer prereleases, but it does not opt into installing them. Use `--prerelease` to install from the prerelease channel.
 
 Dev builds (version = `dev`) skip the check.
 
@@ -78,8 +82,12 @@ Dev builds (version = `dev`) skip the check.
 After upgrading `kt`, run this in each project to pull in the latest `.kt/mk/`:
 
 ```bash
-kt update-tools
+kt update-tools --check
+kt update-tools --diff
+kt update-tools --apply
 ```
+
+Use `--check` in CI to detect drift, `--diff` to inspect local changes, and `--apply` with either mode to refresh the tooling.
 
 ## Embedded asset layout
 
@@ -91,5 +99,4 @@ internal/assets/
   templates/projects/
 ```
 
-The root `deploy/` folder only packages the `kt` binary itself; it is unrelated
-to generated project templates.
+The root `deploy/` folder only packages the `kt` binary itself; it is unrelated to generated project templates.

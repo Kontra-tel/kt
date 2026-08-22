@@ -1,10 +1,23 @@
 # Project contract used by kt, Make, and packaging.
-# Safe to edit after scaffold:
-# - app: package/application name used in paths and package metadata
-# - kind: project shape; keep this aligned with the template family
-# - services: blank for CLI-only projects
+# Safe to edit after scaffold.
 schema: kt.project/v1
 template: {{.Template}}
 app: {{.App}}
 kind: cli
-services:
+package:
+  name: {{.App}}
+  maintainer: {{.Author}}
+  description: {{.App}} command-line application
+  section: utils
+services: []
+commands:
+  - name: {{.App}}
+    path: deploy/bin/{{.App}}
+config:
+  dir: deploy/config
+  install_dir: /etc/{{.App}}
+  example_suffix: .example
+release:
+  tag_prefix: v
+kt:
+  scaffold_version: "1.4"

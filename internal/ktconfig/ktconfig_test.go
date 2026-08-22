@@ -183,3 +183,51 @@ func TestLoad_NormalizesCLIProject(t *testing.T) {
 		t.Fatalf("HasServices() = true, want false")
 	}
 }
+
+func TestLoad_ParsesStructuredProject(t *testing.T) {
+	setup(t, `schema: kt.project/v1
+template: mixed
+app: suite
+kind: mixed
+package:
+  name: suite
+  maintainer: Ops <ops@example.invalid>
+services:
+  - name: suite-service
+    role: service
+    runner: deploy/run/suite-service
+    unit: deploy/systemd/suite-service.service
+    user: svc
+    group: ops
+commands:
+  - name: suite
+    path: deploy/bin/suite
+config:
+  dir: deploy/config
+  install_dir: /etc/suite
+  example_suffix: .example
+release:
+  tag_prefix: v
+kt:
+  scaffold_version: "1.4"
+`)
+	project, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := project.ServicesList(); len(got) != 1 || got[0] != "suite-service" {
+		t.Fatalf("ServicesList() = %v, want [suite-service]", got)
+	}
+	if len(project.ServiceDetails()) != 1 || project.ServiceDetails()[0].Runner != "deploy/run/suite-service" {
+		t.Fatalf("ServiceDetails() = %+v", project.ServiceDetails())
+	}
+	if len(project.Commands) != 1 || project.Commands[0].Path != "deploy/bin/suite" {
+		t.Fatalf("Commands = %+v", project.Commands)
+	}
+	if project.Package.Maintainer != "Ops <ops@example.invalid>" {
+		t.Fatalf("Package.Maintainer = %q", project.Package.Maintainer)
+	}
+	if project.Config.InstallDir != "/etc/suite" || project.Release.TagPrefix != "v" || project.KT.ScaffoldVersion != "1.4" {
+		t.Fatalf("structured metadata not parsed: %+v", project)
+	}
+}

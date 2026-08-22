@@ -1,13 +1,35 @@
 # Project contract used by kt, Make, and packaging.
-# Safe to edit after scaffold:
-# - app: package/application name used in paths and package metadata
-# - kind: project shape; keep this aligned with the template family
-# - services: comma-separated packaged service names
-# - user/group: service account for service-bearing templates
+# Safe to edit after scaffold.
 schema: kt.project/v1
 template: {{.Template}}
 app: {{.App}}
 kind: multi-service
-services: {{.App}}-backend,{{.App}}-frontend
-user: {{.ServiceUser}}
-group: {{.ServiceGroup}}
+package:
+  name: {{.App}}
+  maintainer: {{.Author}}
+  description: {{.App}} multi-service package
+  section: default
+services:
+  - name: {{.App}}-backend
+    role: backend
+    runner: deploy/run/{{.App}}-backend
+    unit: deploy/systemd/{{.App}}-backend.service
+    user: {{.ServiceUser}}
+    group: {{.ServiceGroup}}
+  - name: {{.App}}-frontend
+    role: frontend
+    runner: deploy/run/{{.App}}-frontend
+    unit: deploy/systemd/{{.App}}-frontend.service
+    user: {{.ServiceUser}}
+    group: {{.ServiceGroup}}
+commands:
+  - name: {{.App}}
+    path: deploy/bin/{{.App}}
+config:
+  dir: deploy/config
+  install_dir: /etc/{{.App}}
+  example_suffix: .example
+release:
+  tag_prefix: v
+kt:
+  scaffold_version: "1.4"

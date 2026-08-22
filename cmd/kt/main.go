@@ -23,47 +23,94 @@ var (
 	commit     = "unknown"
 	date       = "unknown"
 	releaseAPI = "https://git.kontra.tel/api/v1/repos/kontra.tel/Kt"
+	globalJSON bool
 )
 
 func main() {
-	if len(os.Args) < 2 {
+	args := parseGlobalArgs(os.Args[1:])
+	if len(args) < 1 {
 		usage()
 		return
 	}
 	s := scaffold.Scaffolder{FS: assets.FS}
-	switch os.Args[1] {
+	switch args[0] {
 	case "init":
-		cmdInit(s, os.Args[2:])
+		cmdInit(s, args[1:])
 	case "templates":
 		cmdTemplates(s)
 	case "install-tools":
-		cmdInstallTools(s, os.Args[2:], false)
+		cmdInstallTools(s, args[1:], false)
 	case "update-tools":
-		cmdInstallTools(s, os.Args[2:], true)
+		cmdInstallTools(s, args[1:], true)
 	case "config":
-		cmdConfig(os.Args[2:])
+		cmdConfig(args[1:])
 	case "deploy":
-		cmdDeploy(os.Args[2:])
+		cmdDeploy(args[1:])
 	case "release":
-		cmdRelease(os.Args[2:])
+		cmdRelease(args[1:])
 	case "doctor":
 		cmdDoctor()
 	case "update":
-		cmdUpdate(os.Args[2:])
+		cmdUpdate(args[1:])
 	case "version":
 		cmdVersion()
 	case "help", "--help", "-h":
 		usage()
 	default:
-		tui.Err("unknown command: " + os.Args[1])
+		suggestion := suggest(args[0], []string{"init", "templates", "install-tools", "update-tools", "config", "deploy", "release", "doctor", "update", "version", "help"})
+		if suggestion != "" {
+			tui.Err("unknown command: " + args[0] + " (did you mean " + suggestion + "?)")
+		} else {
+			tui.Err("unknown command: " + args[0])
+		}
 		usage()
 		os.Exit(2)
 	}
 }
 
+func parseGlobalArgs(args []string) []string {
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--quiet", "-q":
+			tui.SetQuiet(true)
+		case "--no-color":
+			tui.SetColor(false)
+		case "--color":
+			i++
+			if i >= len(args) {
+				tui.Err("--color requires auto, always, or never")
+				os.Exit(2)
+			}
+			switch args[i] {
+			case "never":
+				tui.SetColor(false)
+			case "always", "auto":
+				tui.SetColor(true)
+			default:
+				tui.Err("--color requires auto, always, or never")
+				os.Exit(2)
+			}
+		case "--json":
+			globalJSON = true
+			tui.SetColor(false)
+		default:
+			out = append(out, args[i])
+		}
+	}
+	return out
+}
+
 func usage() {
 	tui.Title("kt", "project scaffolding for Make, nFPM, systemd, and tag-based releases")
 
+	tui.Header("Global flags")
+	tui.Table([]string{"flag", "description"}, [][]string{
+		{"--json", "machine-readable output where supported"},
+		{"--quiet, -q", "suppress non-error status output"},
+		{"--no-color", "disable styling"},
+		{"--color auto|always|never", "control styling"},
+	})
 	tui.Header("Project")
 	tui.Table([]string{"command", "description"}, [][]string{
 		{"kt init <template> <app> [--dir .] [--force]", "create a new project"},
@@ -79,13 +126,14 @@ func usage() {
 		{"kt release next <patch|minor|major|pre|stable> [--pre rc]", "print next version"},
 		{"kt release plan <kind|version> [--pre rc] [--json]", "preview tag, dirty state, conflicts"},
 		{"kt release validate <vversion> [--github-output]", "validate CI release tag"},
+		{"kt release notes [range|--since latest]", "print bullet release notes from git log"},
 		{"kt release tag|push <version>", "create immutable annotated tag"},
 	})
 
 	tui.Header("Tooling")
 	tui.Table([]string{"command", "description"}, [][]string{
-		{"kt install-tools [--dir .] [--force]", "install .kt/mk helpers"},
-		{"kt update-tools [--dir .] [--force]", "refresh .kt/mk helpers"},
+		{"kt install-tools [--dir .] [--force] [--check|--diff] [--apply]", "install or inspect .kt/mk helpers"},
+		{"kt update-tools [--dir .] [--force] [--check|--diff] [--apply]", "refresh or inspect .kt/mk helpers"},
 		{"kt update [--check] [--prerelease]", "update kt itself"},
 		{"kt doctor", "run project doctor checks"},
 		{"kt version", "print build metadata"},
@@ -100,6 +148,7 @@ func usage() {
 func cmdInit(s scaffold.Scaffolder, args []string) {
 	var positional []string
 	dir := "."
+	dirSet := false
 	force := false
 	for i := 0; i < len(args); i++ {
 		a := args[i]
@@ -108,6 +157,7 @@ func cmdInit(s scaffold.Scaffolder, args []string) {
 			i++
 			if i < len(args) {
 				dir = args[i]
+				dirSet = true
 			}
 		case "--force":
 			force = true
@@ -116,11 +166,15 @@ func cmdInit(s scaffold.Scaffolder, args []string) {
 		}
 	}
 
+	interactive := len(positional) < 2
 	var tmplName, appName string
-	if len(positional) >= 2 {
+	if !interactive {
 		tmplName, appName = positional[0], positional[1]
 	} else {
 		tmplName, appName = promptInit(s, positional)
+		if !dirSet {
+			dir = tui.Input("Target directory", dir)
+		}
 	}
 	if !ktconfig.SafeName(appName) {
 		tui.Err("app name must match [a-z0-9][a-z0-9-]*")
@@ -128,6 +182,23 @@ func cmdInit(s scaffold.Scaffolder, args []string) {
 	}
 
 	ctx := scaffold.Context{Template: tmplName, App: appName}
+	if interactive {
+		ctx.Author = tui.Input("Package maintainer", defaultMaintainer())
+		if templateHasService(tmplName) {
+			ctx.ServiceUser = tui.Input("Service user", appName)
+			ctx.ServiceGroup = tui.Input("Service group", ctx.ServiceUser)
+		}
+		tui.Header("Create project")
+		tui.Table([]string{"field", "value"}, [][]string{
+			{"template", tmplName},
+			{"app", appName},
+			{"directory", dir},
+			{"maintainer", ctx.Author},
+			{"service user", ctx.ServiceUser},
+			{"service group", ctx.ServiceGroup},
+		})
+	}
+
 	tui.Header("Initializing " + ctx.App)
 	if err := s.Init(dir, ctx, force); err != nil {
 		tui.Err(err.Error())
@@ -137,7 +208,7 @@ func cmdInit(s scaffold.Scaffolder, args []string) {
 		tui.Warn("template 'app' is kept for compatibility; prefer 'service' for new projects")
 	}
 	tui.OK("created project structure")
-	tui.Info("next: " + initNextHint(dir))
+	tui.Info(initNextHint(dir))
 }
 
 func promptInit(s scaffold.Scaffolder, positional []string) (tmplName, appName string) {
@@ -156,11 +227,15 @@ func promptInit(s scaffold.Scaffolder, positional []string) (tmplName, appName s
 	for i, t := range infos {
 		labels[i] = fmt.Sprintf("%-*s  %s", maxLen, t.Name, tui.Muted(t.Desc))
 	}
-	idx := tui.Select("Choose a template", labels)
-	tmplName = infos[idx].Name
-
 	if len(positional) >= 1 {
-		appName = positional[0]
+		tmplName = positional[0]
+	} else {
+		idx := tui.Select("Choose a template", labels)
+		tmplName = infos[idx].Name
+	}
+
+	if len(positional) >= 2 {
+		appName = positional[1]
 	} else {
 		appName = tui.Input("App name", "")
 		for appName == "" {
@@ -201,13 +276,84 @@ func cmdInstallTools(s scaffold.Scaffolder, args []string, update bool) {
 	fs := flag.NewFlagSet(name, flag.ExitOnError)
 	dir := fs.String("dir", ".", "target directory")
 	force := fs.Bool("force", forceDefault, forceUsage)
+	checkOnly := fs.Bool("check", false, "exit 1 if local .kt/mk differs from embedded tooling")
+	diffOnly := fs.Bool("diff", false, "print diff between local .kt/mk and embedded tooling")
+	apply := fs.Bool("apply", false, "apply update after check/diff")
 	_ = fs.Parse(args)
+	if *checkOnly || *diffOnly {
+		changed, err := toolDiff(s, *dir, *diffOnly)
+		if err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
+		if changed {
+			if *apply {
+				tui.Warn("local .kt/mk differs; applying embedded tooling")
+				if err := s.InstallTools(*dir, true); err != nil {
+					tui.Err(err.Error())
+					os.Exit(1)
+				}
+				tui.OK("updated .kt/mk")
+				return
+			}
+			tui.Warn("local .kt/mk differs from embedded tooling")
+			os.Exit(1)
+		}
+		tui.OK("local .kt/mk matches embedded tooling")
+		return
+	}
 	tui.Header(header)
 	if err := s.InstallTools(*dir, *force); err != nil {
 		tui.Err(err.Error())
 		os.Exit(1)
 	}
 	tui.OK(success)
+}
+
+func toolDiff(s scaffold.Scaffolder, dir string, print bool) (bool, error) {
+	tmp, err := os.MkdirTemp("", "kt-tools-*")
+	if err != nil {
+		return false, err
+	}
+	defer os.RemoveAll(tmp)
+	if err := s.InstallTools(tmp, true); err != nil {
+		return false, err
+	}
+	want := filepath.Join(tmp, ".kt", "mk")
+	got := filepath.Join(dir, ".kt", "mk")
+	if _, err := os.Stat(got); err != nil {
+		if print {
+			fmt.Printf("Only in embedded tooling: .kt/mk\n")
+		}
+		return true, nil
+	}
+	cmd := exec.Command("diff", "-ru", got, want)
+	out, err := cmd.CombinedOutput()
+	if len(out) > 0 && print {
+		fmt.Print(string(out))
+	}
+	if err == nil {
+		return false, nil
+	}
+	if exit, ok := err.(*exec.ExitError); ok && exit.ExitCode() == 1 {
+		return true, nil
+	}
+	return true, err
+}
+
+func templateHasService(name string) bool {
+	return name == "app" || name == "service" || name == "mixed" || name == "multi"
+}
+
+func defaultMaintainer() string {
+	name, _ := exec.Command("git", "config", "user.name").Output()
+	email, _ := exec.Command("git", "config", "user.email").Output()
+	n := strings.TrimSpace(string(name))
+	e := strings.TrimSpace(string(email))
+	if n != "" && e != "" {
+		return n + " <" + e + ">"
+	}
+	return n
 }
 
 func cmdConfig(args []string) {
@@ -238,27 +384,28 @@ func cmdConfig(args []string) {
 		}
 		tui.OK(args[1] + " = " + args[2])
 	case "show":
-		if len(args) > 1 && args[1] == "--json" {
+		if (len(args) > 1 && args[1] == "--json") || globalJSON {
 			project, err := ktconfig.Load()
 			if err != nil {
 				tui.Err(err.Error())
 				os.Exit(1)
 			}
 			out := map[string]any{
-				"schema":   project.Schema,
-				"template": project.Template,
-				"app":      project.App,
-				"kind":     project.Kind,
-				"services": project.ServicesList(),
-				"user":     project.User,
-				"group":    project.Group,
+				"schema":          project.Schema,
+				"template":        project.Template,
+				"app":             project.App,
+				"kind":            project.Kind,
+				"services":        project.ServicesList(),
+				"service_details": project.ServiceDetails(),
+				"commands":        project.Commands,
+				"package":         project.Package,
+				"config":          project.Config,
+				"release":         project.Release,
+				"kt":              project.KT,
+				"user":            project.User,
+				"group":           project.Group,
 			}
-			enc := json.NewEncoder(os.Stdout)
-			enc.SetIndent("", "  ")
-			if err := enc.Encode(out); err != nil {
-				tui.Err(err.Error())
-				os.Exit(1)
-			}
+			writeJSON(out)
 			return
 		}
 		pairs, err := ktconfig.All()
@@ -320,7 +467,7 @@ func cmdDeploy(args []string) {
 		tui.Err("usage: kt deploy inspect [--json] | check [--json]")
 		os.Exit(2)
 	}
-	jsonOut := len(args) > 1 && args[1] == "--json"
+	jsonOut := globalJSON || (len(args) > 1 && args[1] == "--json")
 	switch args[0] {
 	case "inspect":
 		info, err := deploycheck.Inspect(".")
@@ -336,7 +483,7 @@ func cmdDeploy(args []string) {
 		tui.Table([]string{"field", "value"}, [][]string{
 			{"app", info.App},
 			{"kind", info.Kind},
-			{"services", strings.Join(info.Services, ", ")},
+			{"services", strings.Join(serviceNames(info.Services), ", ")},
 			{"config", info.ConfigDir},
 			{"data", info.DataDir},
 			{"logs", info.LogDir},
@@ -381,6 +528,14 @@ func cmdDeploy(args []string) {
 	}
 }
 
+func serviceNames(services []ktconfig.Service) []string {
+	names := make([]string, 0, len(services))
+	for _, service := range services {
+		names = append(names, service.Name)
+	}
+	return names
+}
+
 func cmdRelease(args []string) {
 	if len(args) < 1 {
 		releaseUsage()
@@ -416,7 +571,7 @@ func cmdRelease(args []string) {
 			tui.Err(err.Error())
 			os.Exit(1)
 		}
-		if opts.json {
+		if opts.json || globalJSON {
 			writeJSON(plan)
 			return
 		}
@@ -443,6 +598,13 @@ func cmdRelease(args []string) {
 			}
 		}
 		tui.OK("valid release tag v" + v.String())
+	case "notes":
+		notes, err := releaseNotes(args[1:])
+		if err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
+		fmt.Print(notes)
 	case "tag", "push":
 		if len(args) != 2 {
 			releaseUsage()
@@ -466,6 +628,10 @@ func cmdRelease(args []string) {
 		}
 		tui.OK("created " + tag)
 	default:
+		suggestion := suggest(args[0], []string{"next", "plan", "notes", "validate", "tag", "push"})
+		if suggestion != "" {
+			tui.Err("unknown release command: " + args[0] + " (did you mean " + suggestion + "?)")
+		}
 		releaseUsage()
 		os.Exit(2)
 	}
@@ -490,7 +656,7 @@ type releasePlan struct {
 }
 
 func releaseUsage() {
-	tui.Err("usage: kt release next <patch|minor|major|pre|stable> [--pre rc] | plan <patch|minor|major|version> [--pre rc] [--json] | validate <vversion> [--github-output] | tag|push <version>")
+	tui.Err("usage: kt release next <patch|minor|major|pre|stable> [--pre rc] | plan <patch|minor|major|version> [--pre rc] [--json] | notes [range|--since latest] | validate <vversion> [--github-output] | tag|push <version>")
 }
 
 func parseReleaseOptions(args []string) releaseOptions {
@@ -538,6 +704,9 @@ func nextRelease(kind, preLabel string) (versioning.Version, error) {
 	default:
 		next, err := current.Next(kind)
 		if err != nil {
+			if s := suggest(kind, []string{"patch", "minor", "major", "pre", "stable"}); s != "" {
+				return versioning.Version{}, fmt.Errorf("%w (did you mean %s?)", err, s)
+			}
 			return versioning.Version{}, err
 		}
 		if preLabel != "" {
@@ -626,6 +795,41 @@ func appendGitHubOutput(version string, prerelease bool) error {
 	return err
 }
 
+func releaseNotes(args []string) (string, error) {
+	rangeSpec := ""
+	if len(args) >= 2 && args[0] == "--since" && args[1] == "latest" {
+		last, err := gitOutput("describe", "--tags", "--abbrev=0", "HEAD^")
+		if err == nil && strings.TrimSpace(last) != "" {
+			rangeSpec = strings.TrimSpace(last) + "..HEAD"
+		}
+	} else if len(args) >= 1 {
+		rangeSpec = args[0]
+	} else {
+		last, err := gitOutput("describe", "--tags", "--abbrev=0", "HEAD^")
+		if err == nil && strings.TrimSpace(last) != "" {
+			rangeSpec = strings.TrimSpace(last) + "..HEAD"
+		}
+	}
+	gitArgs := []string{"log", "--oneline"}
+	if rangeSpec != "" {
+		gitArgs = append(gitArgs, rangeSpec)
+	}
+	out, err := gitOutput(gitArgs...)
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(out) == "" {
+		return "No changes.\n", nil
+	}
+	var b strings.Builder
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		b.WriteString("- ")
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	return b.String(), nil
+}
+
 func latestReleaseVersion() (versioning.Version, error) {
 	out, err := gitOutput("for-each-ref", "--merged=HEAD", "--sort=-version:refname", "--format=%(refname:strip=2)", "refs/tags/v*")
 	if err != nil {
@@ -687,6 +891,7 @@ func gitRunQuiet(args ...string) error {
 func cmdDoctor() { runMake("doctor") }
 
 func cmdUpdate(args []string) {
+
 	checkOnly := false
 	includePrerelease := false
 	for _, arg := range args {
@@ -764,6 +969,48 @@ func cmdUpdate(args []string) {
 		os.Exit(1)
 	}
 	tui.OK("updated to " + latest + " — restart kt to use the new version")
+}
+func suggest(input string, options []string) string {
+	best := ""
+	bestDistance := 3
+	for _, option := range options {
+		d := editDistance(input, option)
+		if d < bestDistance {
+			bestDistance = d
+			best = option
+		}
+	}
+	return best
+}
+
+func editDistance(a, b string) int {
+	prev := make([]int, len(b)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	for i := 1; i <= len(a); i++ {
+		cur := make([]int, len(b)+1)
+		cur[0] = i
+		for j := 1; j <= len(b); j++ {
+			cost := 0
+			if a[i-1] != b[j-1] {
+				cost = 1
+			}
+			cur[j] = min3(cur[j-1]+1, prev[j]+1, prev[j-1]+cost)
+		}
+		prev = cur
+	}
+	return prev[len(b)]
+}
+
+func min3(a, b, c int) int {
+	if a < b && a < c {
+		return a
+	}
+	if b < c {
+		return b
+	}
+	return c
 }
 
 func canWriteDir(dir string) bool {

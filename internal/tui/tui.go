@@ -23,6 +23,8 @@ const (
 )
 
 var (
+	quiet       bool
+	plain       bool
 	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
 	headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
 	okStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("42"))
@@ -32,7 +34,33 @@ var (
 	dimStyle    = lipgloss.NewStyle().Faint(true)
 )
 
+func SetQuiet(v bool) { quiet = v }
+
+func SetColor(enabled bool) {
+	plain = !enabled
+	if enabled {
+		titleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
+		headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
+		okStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("42"))
+		warnStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214"))
+		errStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("196"))
+		infoStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("75"))
+		dimStyle = lipgloss.NewStyle().Faint(true)
+		return
+	}
+	titleStyle = lipgloss.NewStyle().Bold(true)
+	headerStyle = lipgloss.NewStyle().Bold(true)
+	okStyle = lipgloss.NewStyle().Bold(true)
+	warnStyle = lipgloss.NewStyle().Bold(true)
+	errStyle = lipgloss.NewStyle().Bold(true)
+	infoStyle = lipgloss.NewStyle()
+	dimStyle = lipgloss.NewStyle()
+}
+
 func Title(name, subtitle string) {
+	if quiet {
+		return
+	}
 	fmt.Println(titleStyle.Render(name))
 	if subtitle != "" {
 		fmt.Println(dimStyle.Render(subtitle))
@@ -40,17 +68,23 @@ func Title(name, subtitle string) {
 }
 
 func Header(s string) {
+	if quiet {
+		return
+	}
 	fmt.Println()
 	fmt.Println(headerStyle.Render(s))
 	fmt.Println(dimStyle.Render(strings.Repeat("─", lipgloss.Width(s))))
 }
 
-func OK(s string)   { status(os.Stdout, okStyle, "ok", s) }
-func Warn(s string) { status(os.Stdout, warnStyle, "warn", s) }
-func Err(s string)  { status(os.Stderr, errStyle, "error", s) }
-func Info(s string) { status(os.Stdout, infoStyle, "next", s) }
+func OK(s string)   { status(os.Stdout, okStyle, "ok", s, true) }
+func Warn(s string) { status(os.Stdout, warnStyle, "warn", s, true) }
+func Err(s string)  { status(os.Stderr, errStyle, "error", s, false) }
+func Info(s string) { status(os.Stdout, infoStyle, "next", s, true) }
 
-func status(w io.Writer, style lipgloss.Style, label, s string) {
+func status(w io.Writer, style lipgloss.Style, label, s string, suppress bool) {
+	if quiet && suppress {
+		return
+	}
 	fmt.Fprintf(w, "%s %s\n", style.Render(label+":"), s)
 }
 
@@ -61,6 +95,9 @@ func Muted(s string) string {
 // Table prints aligned human-readable rows without letting ANSI escape codes
 // distort column widths.
 func Table(headers []string, rows [][]string) {
+	if quiet {
+		return
+	}
 	widths := make([]int, len(headers))
 	for i, h := range headers {
 		widths[i] = lipgloss.Width(stripANSI(strings.ToUpper(h)))
@@ -146,7 +183,7 @@ func Select(label string, options []string) int {
 // Input prompts for text and returns def on empty input.
 func Input(prompt, def string) string {
 	if interactiveTerminal() {
-		value := def
+		value := ""
 		field := huh.NewInput().
 			Title(prompt).
 			Value(&value)
@@ -176,6 +213,9 @@ func Input(prompt, def string) string {
 }
 
 func interactiveTerminal() bool {
+	if plain {
+		return false
+	}
 	stdin, err := os.Stdin.Stat()
 	if err != nil || stdin.Mode()&os.ModeCharDevice == 0 {
 		return false

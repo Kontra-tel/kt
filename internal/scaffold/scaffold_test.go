@@ -264,7 +264,7 @@ func TestInit_ProjectYAML(t *testing.T) {
 	}
 	content := string(data)
 
-	for _, want := range []string{"app: my-api", "kind: service", "services: my-api", "user: svc", "group: ops", "template: app"} {
+	for _, want := range []string{"app: my-api", "kind: service", "package:", "name: my-api", "runner: deploy/run/my-api", "unit: deploy/systemd/my-api.service", "user: svc", "group: ops", "template: app", "scaffold_version: \"1.4\""} {
 		if !strings.Contains(content, want) {
 			t.Errorf("project.yaml missing %q:\n%s", want, content)
 		}

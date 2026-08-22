@@ -17,12 +17,14 @@ type Check struct {
 }
 
 type Info struct {
-	App       string   `json:"app"`
-	Kind      string   `json:"kind"`
-	Services  []string `json:"services"`
-	ConfigDir string   `json:"config_dir"`
-	DataDir   string   `json:"data_dir"`
-	LogDir    string   `json:"log_dir"`
+	App       string             `json:"app"`
+	Kind      string             `json:"kind"`
+	Services  []ktconfig.Service `json:"services"`
+	ConfigDir string             `json:"config_dir"`
+	DataDir   string             `json:"data_dir"`
+	LogDir    string             `json:"log_dir"`
+	Units     []string           `json:"units"`
+	Runners   []string           `json:"runners"`
 }
 
 func Inspect(dir string) (Info, error) {
@@ -30,13 +32,23 @@ func Inspect(dir string) (Info, error) {
 	if err != nil {
 		return Info{}, err
 	}
+	services := project.ServiceDetails()
+	units := make([]string, 0, len(services))
+	runners := make([]string, 0, len(services))
+	for i := range services {
+		services[i] = fillServiceDefaults(project, services[i])
+		units = append(units, filepath.Base(services[i].Unit))
+		runners = append(runners, filepath.Join("/usr/lib", project.App, "bin", filepath.Base(services[i].Runner)))
+	}
 	return Info{
 		App:       project.App,
 		Kind:      project.Kind,
-		Services:  project.ServicesList(),
-		ConfigDir: filepath.Join("/etc", project.App),
+		Services:  services,
+		ConfigDir: project.Config.InstallDir,
 		DataDir:   filepath.Join("/var/lib", project.App),
 		LogDir:    filepath.Join("/var/log", project.App),
+		Units:     units,
+		Runners:   runners,
 	}, nil
 }
 
@@ -66,10 +78,14 @@ func CheckProject(dir string) ([]Check, error) {
 		add("error", "package manifest", filepath.Join(dir, "nfpm.yaml"), "missing nfpm.yaml")
 	}
 
-	if hasConfigExample(filepath.Join(dir, "deploy", "config")) {
-		add("ok", "config examples", filepath.Join(dir, "deploy", "config"), "")
+	configDir := project.Config.Dir
+	if configDir == "" {
+		configDir = filepath.Join("deploy", "config")
+	}
+	if hasConfigExample(filepath.Join(dir, configDir), project.Config.ExampleSuffix) {
+		add("ok", "config examples", filepath.Join(dir, configDir), "")
 	} else {
-		add("warn", "config examples", filepath.Join(dir, "deploy", "config"), "no *.example files found")
+		add("warn", "config examples", filepath.Join(dir, configDir), "no *"+project.Config.ExampleSuffix+" files found")
 	}
 
 	if project.Kind == "cli" {
@@ -78,12 +94,13 @@ func CheckProject(dir string) ([]Check, error) {
 		return checks, nil
 	}
 
-	for _, service := range project.ServicesList() {
-		runner := filepath.Join(dir, "deploy", "run", service)
-		unit := filepath.Join(dir, "deploy", "systemd", service+".service")
+	for _, svc := range project.ServiceDetails() {
+		service := fillServiceDefaults(project, svc)
+		runner := filepath.Join(dir, service.Runner)
+		unit := filepath.Join(dir, service.Unit)
 		checkExecutable(&checks, dir, "service runner", runner)
 		checkFile(&checks, dir, "service unit", unit)
-		checkUnit(&checks, dir, project.App, service, unit)
+		checkUnit(&checks, dir, project.App, service.Name, unit)
 	}
 	for _, stale := range []string{
 		filepath.Join(dir, ".kt", "scripts", "postinstall-systemd.sh"),
@@ -103,6 +120,22 @@ func HasErrors(checks []Check) bool {
 		}
 	}
 	return false
+}
+
+func fillServiceDefaults(p ktconfig.Project, s ktconfig.Service) ktconfig.Service {
+	if s.Runner == "" && s.Name != "" {
+		s.Runner = filepath.Join("deploy", "run", s.Name)
+	}
+	if s.Unit == "" && s.Name != "" {
+		s.Unit = filepath.Join("deploy", "systemd", s.Name+".service")
+	}
+	if s.User == "" {
+		s.User = p.User
+	}
+	if s.Group == "" {
+		s.Group = p.Group
+	}
+	return s
 }
 
 func checkFile(checks *[]Check, root, name, path string) {
@@ -145,13 +178,16 @@ func checkUnit(checks *[]Check, root, app, service, unit string) {
 	}
 }
 
-func hasConfigExample(dir string) bool {
+func hasConfigExample(dir, suffix string) bool {
+	if suffix == "" {
+		suffix = ".example"
+	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return false
 	}
 	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".example") {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), suffix) {
 			return true
 		}
 	}

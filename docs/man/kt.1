@@ -3,6 +3,7 @@
 kt \- scaffold Make, nFPM, systemd, and tag-based release projects
 .SH SYNOPSIS
 .B kt
+.RI [ global-options ]
 .I command
 .RI [ arguments ]
 .SH DESCRIPTION
@@ -15,6 +16,19 @@ manifest, validates deploy files, and manages tag-based releases.
 The generated projects deliberately stay boring: Make builds, nFPM packages,
 systemd runs services, and external deployment automation decides when to
 install, migrate, restart, and roll back.
+.SH GLOBAL OPTIONS
+.TP
+.B \-\-json
+Use machine-readable output where supported.
+.TP
+.B \-\-quiet, \-q
+Suppress non-error status output.
+.TP
+.B \-\-no-color
+Disable ANSI styling.
+.TP
+.B \-\-color auto|always|never
+Control ANSI styling.
 .SH COMMANDS
 .SS Project commands
 .TP
@@ -38,7 +52,7 @@ Print one value from
 .IR .kt/project.yaml .
 .TP
 .B kt config set \fIkey\fR \fIvalue\fR
-Update or append a value in
+Update or append a top-level scalar value in
 .IR .kt/project.yaml .
 .TP
 .B kt config show [\-\-json]
@@ -50,7 +64,7 @@ prints the normalized contract as JSON.
 Print the normalized project shape.
 .TP
 .B kt config validate
-Validate app name, kind, services, and service account fields.
+Validate app name, kind, services, service paths, and service account fields.
 .TP
 .B kt config init|diff|check
 Delegate to the generated Make config targets for
@@ -59,7 +73,9 @@ Delegate to the generated Make config targets for
 .TP
 .B kt deploy inspect [\-\-json]
 Print deploy metadata derived from
-.IR .kt/project.yaml .
+.IR .kt/project.yaml ,
+including structured services, config/data/log directories, unit names, and
+installed runner paths.
 .TP
 .B kt deploy check [\-\-json]
 Validate the project manifest, package manifest, config examples, service
@@ -82,6 +98,10 @@ Promote the current prerelease to a stable version.
 Preview the current release, next version, tag, dirty state, and local/remote
 tag conflicts.
 .TP
+.B kt release notes [\fIrange\fR|\-\-since latest]
+Print Markdown bullet release notes from
+.B git log --oneline .
+.TP
 .B kt release validate \fIvversion\fR [\-\-github-output]
 Validate a strict
 .B v<semver>
@@ -101,15 +121,21 @@ Create and push an immutable annotated tag to
 .BR origin .
 .SS Tooling commands
 .TP
-.B kt install-tools [\-\-dir \fIdir\fR] [\-\-force]
+.B kt install-tools [\-\-dir \fIdir\fR] [\-\-force] [\-\-check|\-\-diff] [\-\-apply]
 Install shared
 .I .kt/mk
-tooling into an existing project.
+tooling into an existing project, or check/diff it against the embedded copy.
 .TP
-.B kt update-tools [\-\-dir \fIdir\fR] [\-\-force]
+.B kt update-tools [\-\-dir \fIdir\fR] [\-\-force] [\-\-check|\-\-diff] [\-\-apply]
 Refresh shared
 .I .kt/mk
-tooling. Updates overwrite by default.
+tooling. Updates overwrite by default. Use
+.B \-\-check
+for CI drift detection,
+.B \-\-diff
+for inspection, and
+.B \-\-apply
+to refresh after check/diff.
 .TP
 .B kt update [\-\-check] [\-\-prerelease]
 Update the
@@ -132,10 +158,30 @@ Key fields are
 .BR template ,
 .BR app ,
 .BR kind ,
+.BR package ,
 .BR services ,
-.BR user ,
+.BR commands ,
+.BR config ,
+.BR release ,
 and
-.BR group .
+.BR kt .
+.PP
+The
+.B services
+field is a structured list for new service-bearing projects. Each service entry
+can name its role, runner path, systemd unit path, user, and group. Legacy
+comma-separated service names still load for older projects.
+.SH GENERATED METADATA
+.TP
+.I dist/app/meta/build.json
+Build metadata written by
+.BR make build-metadata .
+.TP
+.I dist/app/meta/deploy.json
+Deploy metadata written by
+.BR make build-metadata ,
+matching
+.BR kt deploy inspect --json .
 .SH FILES
 .TP
 .I .kt/project.yaml
@@ -164,9 +210,11 @@ Install script binary destination. Defaults to
 .SH EXAMPLES
 .EX
 kt init service my-api
+kt --json deploy inspect
 kt templates
 kt config validate
 kt deploy check
+kt release notes --since latest
 kt release plan minor
 kt release next minor --pre rc
 kt release push 1.4.0
