@@ -53,6 +53,10 @@ make install
 
 It is **not** a deployment framework — it sets up the structure, then normal Linux tools do the rest.
 
+## Project status
+
+`kt` is maintained mainly for the maintainer's personal workflow. Contributions are welcome when they fit that direction, but support and feature work are best-effort. Forks and forked releases are encouraged when your needs diverge; see [Contributing](CONTRIBUTING.md).
+
 ## Available templates
 
 | Template | Description |
@@ -102,6 +106,7 @@ kt update --prerelease
 
 ## Documentation
 
+- [Contributing](CONTRIBUTING.md)
 - [Commands](docs/commands.md)
 - Manual page: `man kt` after package or `make install`
 - [Templates](docs/templates.md)
