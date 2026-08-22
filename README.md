@@ -104,6 +104,10 @@ kt update --check # check only, exits 1 if a stable or prerelease update is avai
 kt update --prerelease
 ```
 
+## License
+
+MIT. See [LICENSE](LICENSE).
+
 ## Documentation
 
 - [Contributing](CONTRIBUTING.md)
