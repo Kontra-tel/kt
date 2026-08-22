@@ -4,8 +4,8 @@
 DOCTOR_TOOLS := git make nfpm
 
 # ── Shared tooling ─────────────────────────────────────────────────────────────
-# These includes provide: APP (from .kt/project.yaml), VERSION (from version.txt),
-# help, config-init/check/diff, doctor, bump-patch/minor/major, and package targets.
+# These includes provide: APP (from .kt/project.yaml), VERSION (from a Git tag),
+# help, config-init/check/diff, doctor, release helpers, and package targets.
 # Do not edit — run `kt update-tools` to pull in the latest versions.
 include .kt/mk/common.mk
 include .kt/mk/version.mk

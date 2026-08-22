@@ -8,7 +8,7 @@
 # APP, ARCH, and VERSION are injected by nfpm.mk at build time:
 #   APP     — from .kt/project.yaml via `kt config get app`
 #   ARCH    — host architecture (amd64, arm64, …)
-#   VERSION — content of version.txt
+#   VERSION — version derived from the release tag or supplied by CI
 
 # ── Package identity ───────────────────────────────────────────────────────────
 name: ${APP}

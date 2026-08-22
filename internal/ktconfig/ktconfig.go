@@ -3,12 +3,16 @@ package ktconfig
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 )
 
 var path = ".kt/project.yaml"
 
+var appNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
+
 type Project struct {
+	Schema   string
 	Template string
 	App      string
 	Kind     string
@@ -75,6 +79,8 @@ func LoadFile(file string) (Project, error) {
 	var p Project
 	for _, pair := range pairs {
 		switch pair[0] {
+		case "schema":
+			p.Schema = pair[1]
 		case "template":
 			p.Template = pair[1]
 		case "app":
@@ -111,6 +117,48 @@ func (p Project) ServicesList() []string {
 
 func (p Project) HasServices() bool {
 	return len(p.ServicesList()) > 0
+}
+
+func SafeName(name string) bool {
+	return appNamePattern.MatchString(name)
+}
+
+// Validate checks the normalized project contract for values kt can safely use
+// in package names, paths, service units, and generated scripts.
+func Validate(p Project) []string {
+	var issues []string
+	if p.Schema != "" && p.Schema != "kt.project/v1" {
+		issues = append(issues, "schema must be kt.project/v1")
+	}
+	if p.App == "" {
+		issues = append(issues, "app is required")
+	} else if !appNamePattern.MatchString(p.App) {
+		issues = append(issues, "app must match [a-z0-9][a-z0-9-]*")
+	}
+	switch p.Kind {
+	case "cli":
+		if p.HasServices() {
+			issues = append(issues, "cli projects must not declare services")
+		}
+	case "service", "mixed", "multi-service":
+		if !p.HasServices() {
+			issues = append(issues, p.Kind+" projects must declare at least one service")
+		}
+		if p.User == "" {
+			issues = append(issues, "service-bearing projects should set user")
+		}
+		if p.Group == "" {
+			issues = append(issues, "service-bearing projects should set group")
+		}
+	default:
+		issues = append(issues, "kind must be cli, service, mixed, or multi-service")
+	}
+	for _, service := range p.ServicesList() {
+		if !appNamePattern.MatchString(service) {
+			issues = append(issues, "service "+service+" must match [a-z0-9][a-z0-9-]*")
+		}
+	}
+	return issues
 }
 
 func allFrom(file string) ([][2]string, error) {

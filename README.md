@@ -49,7 +49,7 @@ make install
 - An `nfpm.yaml` for building `.deb`, `.rpm`, and Arch Linux packages with [nFPM](https://nfpm.goreleaser.com)
 - systemd service units with security hardening (for service templates)
 - `deploy/` scripts for install and removal lifecycle
-- A `.gitignore` and `version.txt`
+- A `.gitignore`; release versions are derived from Git tags
 
 It is **not** a deployment framework — it sets up the structure, then normal Linux tools do the rest.
 

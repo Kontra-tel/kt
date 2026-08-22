@@ -57,15 +57,47 @@ else:
     print('', end='')
 " "$ASSET")
 
+SUMS_URL=$(echo "$RELEASE" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for a in data.get('assets', []):
+    if a['name'] == 'SHA256SUMS':
+        print(a['browser_download_url'])
+        break
+else:
+    print('', end='')
+")
+
 if [ -z "$URL" ]; then
     echo "No binary found for ${OS}/${ARCH} in release ${TAG}" >&2
+    exit 1
+fi
+if [ -z "$SUMS_URL" ]; then
+    echo "No SHA256SUMS found in release ${TAG}" >&2
     exit 1
 fi
 
 echo "Installing kt ${TAG} (${OS}/${ARCH}) to ${BIN_DIR}/kt..."
 TMP=$(mktemp)
-trap 'rm -f "$TMP"' EXIT
+SUMS=$(mktemp)
+trap 'rm -f "$TMP" "$SUMS"' EXIT
 curl -sL "$URL" -o "$TMP"
+curl -sL "$SUMS_URL" -o "$SUMS"
+python3 -c "
+import hashlib, pathlib, sys
+asset, binary, sums = sys.argv[1:]
+want = None
+for line in pathlib.Path(sums).read_text().splitlines():
+    parts = line.split()
+    if len(parts) >= 2 and parts[1] == asset:
+        want = parts[0].lower()
+        break
+if not want:
+    raise SystemExit(f'No checksum for {asset}')
+got = hashlib.sha256(pathlib.Path(binary).read_bytes()).hexdigest()
+if got != want:
+    raise SystemExit(f'Checksum mismatch for {asset}')
+" "$ASSET" "$TMP" "$SUMS"
 chmod +x "$TMP"
 
 if [ -w "$BIN_DIR" ]; then

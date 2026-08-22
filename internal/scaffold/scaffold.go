@@ -121,12 +121,6 @@ func (s Scaffolder) Init(dest string, ctx Context, force bool) error {
 	if err := copyTree(s.FS, base, dest, &ctx, force); err != nil {
 		return err
 	}
-	vf := filepath.Join(dest, "version.txt")
-	if _, err := os.Stat(vf); os.IsNotExist(err) {
-		if err := os.WriteFile(vf, []byte("0.1.0\n"), 0644); err != nil {
-			return err
-		}
-	}
 	return chmodScripts(dest)
 }
 

@@ -148,7 +148,6 @@ func TestInit_AppFiles(t *testing.T) {
 	mustExist(t, dir,
 		"Makefile",
 		"nfpm.yaml",
-		"version.txt",
 		".gitignore",
 		".kt/project.yaml",
 		".kt/mk/common.mk",
@@ -484,7 +483,6 @@ func TestInit_TreeShape(t *testing.T) {
 			"deploy/bin/treeapp",
 			"deploy/config/app.env.example",
 			"nfpm.yaml",
-			"version.txt",
 		},
 		"service": {
 			".gitignore",
@@ -499,7 +497,6 @@ func TestInit_TreeShape(t *testing.T) {
 			"deploy/scripts/preremove.sh",
 			"deploy/systemd/treeapp.service",
 			"nfpm.yaml",
-			"version.txt",
 		},
 		"mixed": {
 			".gitignore",
@@ -515,7 +512,6 @@ func TestInit_TreeShape(t *testing.T) {
 			"deploy/scripts/preremove.sh",
 			"deploy/systemd/treeapp-service.service",
 			"nfpm.yaml",
-			"version.txt",
 		},
 		"multi": {
 			".gitignore",
@@ -532,7 +528,6 @@ func TestInit_TreeShape(t *testing.T) {
 			"deploy/systemd/treeapp-backend.service",
 			"deploy/systemd/treeapp-frontend.service",
 			"nfpm.yaml",
-			"version.txt",
 		},
 	}
 	for tmpl, wants := range tests {

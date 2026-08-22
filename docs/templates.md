@@ -17,6 +17,7 @@ project contract.
 
 | Key | Meaning |
 | --- | --- |
+| `schema` | Project manifest schema (`kt.project/v1` for new scaffolds) |
 | `template` | Template name as chosen by the user |
 | `app` | Package / application name |
 | `kind` | `cli`, `service`, `mixed`, or `multi-service` |
