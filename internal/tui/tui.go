@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -24,6 +23,7 @@ const (
 )
 
 var (
+	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
 	headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
 	okStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("42"))
 	warnStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214"))
@@ -32,40 +32,76 @@ var (
 	dimStyle    = lipgloss.NewStyle().Faint(true)
 )
 
-func Header(s string) { fmt.Println(headerStyle.Render("▸ " + s)) }
-func OK(s string)     { status(os.Stdout, okStyle, "✓", s) }
-func Warn(s string)   { status(os.Stdout, warnStyle, "!", s) }
-func Err(s string)    { status(os.Stderr, errStyle, "✗", s) }
-func Info(s string)   { status(os.Stdout, infoStyle, "•", s) }
+func Title(name, subtitle string) {
+	fmt.Println(titleStyle.Render(name))
+	if subtitle != "" {
+		fmt.Println(dimStyle.Render(subtitle))
+	}
+}
 
-func status(w io.Writer, style lipgloss.Style, marker, s string) {
-	fmt.Fprintf(w, "%s %s\n", style.Render(marker), s)
+func Header(s string) {
+	fmt.Println()
+	fmt.Println(headerStyle.Render(s))
+	fmt.Println(dimStyle.Render(strings.Repeat("─", lipgloss.Width(s))))
+}
+
+func OK(s string)   { status(os.Stdout, okStyle, "ok", s) }
+func Warn(s string) { status(os.Stdout, warnStyle, "warn", s) }
+func Err(s string)  { status(os.Stderr, errStyle, "error", s) }
+func Info(s string) { status(os.Stdout, infoStyle, "next", s) }
+
+func status(w io.Writer, style lipgloss.Style, label, s string) {
+	fmt.Fprintf(w, "%s %s\n", style.Render(label+":"), s)
 }
 
 func Muted(s string) string {
 	return dimStyle.Render(s)
 }
 
-// Table prints aligned human-readable rows.
+// Table prints aligned human-readable rows without letting ANSI escape codes
+// distort column widths.
 func Table(headers []string, rows [][]string) {
-	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	widths := make([]int, len(headers))
 	for i, h := range headers {
-		if i > 0 {
-			fmt.Fprint(tw, "\t")
-		}
-		fmt.Fprint(tw, headerStyle.Render(strings.ToUpper(h)))
+		widths[i] = lipgloss.Width(stripANSI(strings.ToUpper(h)))
 	}
-	fmt.Fprintln(tw)
 	for _, row := range rows {
 		for i, cell := range row {
-			if i > 0 {
-				fmt.Fprint(tw, "\t")
+			if i < len(widths) && lipgloss.Width(stripANSI(cell)) > widths[i] {
+				widths[i] = lipgloss.Width(stripANSI(cell))
 			}
-			fmt.Fprint(tw, cell)
 		}
-		fmt.Fprintln(tw)
 	}
-	_ = tw.Flush()
+	printRow := func(cells []string, style lipgloss.Style) {
+		fmt.Print("  ")
+		for i := range headers {
+			if i > 0 {
+				fmt.Print("  ")
+			}
+			cell := ""
+			if i < len(cells) {
+				cell = cells[i]
+			}
+			fmt.Print(style.Render(padRight(cell, widths[i])))
+		}
+		fmt.Println()
+	}
+	upper := make([]string, len(headers))
+	for i, h := range headers {
+		upper[i] = strings.ToUpper(h)
+	}
+	printRow(upper, headerStyle)
+	for _, row := range rows {
+		printRow(row, lipgloss.NewStyle())
+	}
+}
+
+func padRight(s string, width int) string {
+	padding := width - lipgloss.Width(stripANSI(s))
+	if padding <= 0 {
+		return s
+	}
+	return s + strings.Repeat(" ", padding)
 }
 
 // Select prompts for a choice and returns the 0-based index of the chosen item.
