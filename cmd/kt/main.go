@@ -66,7 +66,7 @@ func main() {
 		} else {
 			tui.Err("unknown command: " + args[0])
 		}
-		usage()
+		fmt.Fprintln(os.Stderr, "hint: run kt help for commands")
 		os.Exit(2)
 	}
 }
