@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"git.kontra.tel/kontra.tel/Kt/internal/assets"
+	"git.kontra.tel/kontra.tel/Kt/internal/deploycheck"
 	"git.kontra.tel/kontra.tel/Kt/internal/ktconfig"
 	"git.kontra.tel/kontra.tel/Kt/internal/scaffold"
 	"git.kontra.tel/kontra.tel/Kt/internal/tui"
@@ -41,6 +42,8 @@ func main() {
 		cmdInstallTools(s, os.Args[2:], true)
 	case "config":
 		cmdConfig(os.Args[2:])
+	case "deploy":
+		cmdDeploy(os.Args[2:])
 	case "release":
 		cmdRelease(os.Args[2:])
 	case "doctor":
@@ -66,14 +69,14 @@ Usage:
   kt init <template> <app> [--dir .] [--force]
   kt install-tools [--dir .] [--force]
   kt update-tools [--dir .] [--force]
-  kt config get <key>
-  kt config set <key> <value>
-  kt config show [--json]
-  kt config shape
+  kt config get|set|show|shape|validate
   kt config init|diff|check
-  kt release next <patch|minor|major>
-  kt release tag <version>
-  kt release push <version>
+  kt deploy inspect [--json]
+  kt deploy check [--json]
+  kt release next <patch|minor|major|pre|stable> [--pre rc]
+  kt release plan <patch|minor|major|version> [--pre rc] [--json]
+  kt release validate <vversion> [--github-output]
+  kt release tag|push <version>
   kt update [--check] [--prerelease]
   kt doctor
   kt version
@@ -115,6 +118,10 @@ func cmdInit(s scaffold.Scaffolder, args []string) {
 	} else {
 		tmplName, appName = promptInit(s, positional)
 	}
+	if !ktconfig.SafeName(appName) {
+		tui.Err("app name must match [a-z0-9][a-z0-9-]*")
+		os.Exit(1)
+	}
 
 	ctx := scaffold.Context{Template: tmplName, App: appName}
 	tui.Header("Initializing " + ctx.App)
@@ -143,7 +150,7 @@ func promptInit(s scaffold.Scaffolder, positional []string) (tmplName, appName s
 		}
 	}
 	for i, t := range infos {
-		labels[i] = fmt.Sprintf("%-*s  %s%s%s", maxLen, t.Name, tui.Dim, t.Desc, tui.Reset)
+		labels[i] = fmt.Sprintf("%-*s  %s", maxLen, t.Name, tui.Muted(t.Desc))
 	}
 	idx := tui.Select("Choose a template", labels)
 	tmplName = infos[idx].Name
@@ -167,15 +174,11 @@ func cmdTemplates(s scaffold.Scaffolder) {
 		tui.Err(err.Error())
 		os.Exit(1)
 	}
-	maxLen := 0
+	rows := make([][]string, 0, len(infos))
 	for _, t := range infos {
-		if len(t.Name) > maxLen {
-			maxLen = len(t.Name)
-		}
+		rows = append(rows, []string{t.Name, t.Desc})
 	}
-	for _, t := range infos {
-		tui.Info(fmt.Sprintf("%-*s  %s", maxLen, t.Name, t.Desc))
-	}
+	tui.Table([]string{"template", "description"}, rows)
 }
 
 func cmdInstallTools(s scaffold.Scaffolder, args []string, update bool) {
@@ -205,7 +208,7 @@ func cmdInstallTools(s scaffold.Scaffolder, args []string, update bool) {
 
 func cmdConfig(args []string) {
 	if len(args) < 1 {
-		tui.Err("usage: kt config get <key> | set <key> <value> | show [--json] | shape | init|diff|check")
+		tui.Err("usage: kt config get <key> | set <key> <value> | show [--json] | shape | validate | init|diff|check")
 		os.Exit(2)
 	}
 	switch args[0] {
@@ -238,6 +241,7 @@ func cmdConfig(args []string) {
 				os.Exit(1)
 			}
 			out := map[string]any{
+				"schema":   project.Schema,
 				"template": project.Template,
 				"app":      project.App,
 				"kind":     project.Kind,
@@ -269,44 +273,177 @@ func cmdConfig(args []string) {
 			os.Exit(1)
 		}
 		tui.Header("Project shape")
-		tui.Info("template: " + project.Template)
-		tui.Info("app:      " + project.App)
-		tui.Info("kind:     " + project.Kind)
+		services := "none"
 		if project.HasServices() {
-			tui.Info("services: " + strings.Join(project.ServicesList(), ", "))
-		} else {
-			tui.Info("services: none")
+			services = strings.Join(project.ServicesList(), ", ")
+		}
+		rows := [][]string{
+			{"schema", project.Schema},
+			{"template", project.Template},
+			{"app", project.App},
+			{"kind", project.Kind},
+			{"services", services},
 		}
 		if project.User != "" {
-			tui.Info("user:     " + project.User)
+			rows = append(rows, []string{"user", project.User})
 		}
 		if project.Group != "" {
-			tui.Info("group:    " + project.Group)
+			rows = append(rows, []string{"group", project.Group})
 		}
+		tui.Table([]string{"field", "value"}, rows)
+	case "validate":
+		project, err := ktconfig.Load()
+		if err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
+		issues := ktconfig.Validate(project)
+		if len(issues) == 0 {
+			tui.OK("project manifest is valid")
+			return
+		}
+		for _, issue := range issues {
+			tui.Err(issue)
+		}
+		os.Exit(1)
 	default:
 		runMake("config-" + args[0])
 	}
 }
 
-func cmdRelease(args []string) {
-	if len(args) != 2 {
-		tui.Err("usage: kt release next <patch|minor|major> | tag <version> | push <version>")
+func cmdDeploy(args []string) {
+	if len(args) < 1 {
+		tui.Err("usage: kt deploy inspect [--json] | check [--json]")
 		os.Exit(2)
 	}
+	jsonOut := len(args) > 1 && args[1] == "--json"
 	switch args[0] {
-	case "next":
-		v, err := latestReleaseVersion()
+	case "inspect":
+		info, err := deploycheck.Inspect(".")
 		if err != nil {
 			tui.Err(err.Error())
 			os.Exit(1)
 		}
-		next, err := v.Next(args[1])
+		if jsonOut {
+			writeJSON(info)
+			return
+		}
+		tui.Header("Deploy")
+		tui.Table([]string{"field", "value"}, [][]string{
+			{"app", info.App},
+			{"kind", info.Kind},
+			{"services", strings.Join(info.Services, ", ")},
+			{"config", info.ConfigDir},
+			{"data", info.DataDir},
+			{"logs", info.LogDir},
+		})
+	case "check":
+		checks, err := deploycheck.CheckProject(".")
+		if err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
+		if jsonOut {
+			writeJSON(map[string]any{"ok": !deploycheck.HasErrors(checks), "checks": checks})
+			if deploycheck.HasErrors(checks) {
+				os.Exit(1)
+			}
+			return
+		}
+		tui.Header("Deploy check")
+		for _, check := range checks {
+			msg := check.Name
+			if check.Path != "" {
+				msg += "  " + tui.Muted(check.Path)
+			}
+			if check.Message != "" {
+				msg += " — " + check.Message
+			}
+			switch check.Level {
+			case "ok":
+				tui.OK(msg)
+			case "warn":
+				tui.Warn(msg)
+			default:
+				tui.Err(msg)
+			}
+		}
+		if deploycheck.HasErrors(checks) {
+			os.Exit(1)
+		}
+	default:
+		tui.Err("usage: kt deploy inspect [--json] | check [--json]")
+		os.Exit(2)
+	}
+}
+
+func cmdRelease(args []string) {
+	if len(args) < 1 {
+		releaseUsage()
+		os.Exit(2)
+	}
+	switch args[0] {
+	case "next":
+		opts := parseReleaseOptions(args[2:])
+		if len(args) < 2 || opts.err != nil {
+			if opts.err != nil {
+				tui.Err(opts.err.Error())
+			}
+			releaseUsage()
+			os.Exit(2)
+		}
+		next, err := nextRelease(args[1], opts.preLabel)
 		if err != nil {
 			tui.Err(err.Error())
 			os.Exit(1)
 		}
 		fmt.Println(next.String())
+	case "plan":
+		opts := parseReleaseOptions(args[2:])
+		if len(args) < 2 || opts.err != nil {
+			if opts.err != nil {
+				tui.Err(opts.err.Error())
+			}
+			releaseUsage()
+			os.Exit(2)
+		}
+		plan, err := buildReleasePlan(args[1], opts.preLabel)
+		if err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
+		if opts.json {
+			writeJSON(plan)
+			return
+		}
+		printReleasePlan(plan)
+	case "validate":
+		opts := parseReleaseOptions(args[2:])
+		if len(args) < 2 || opts.err != nil {
+			if opts.err != nil {
+				tui.Err(opts.err.Error())
+			}
+			releaseUsage()
+			os.Exit(2)
+		}
+		v, err := parseReleaseTag(args[1])
+		if err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
+		prerelease := v.Pre != ""
+		if opts.githubOutput {
+			if err := appendGitHubOutput(v.String(), prerelease); err != nil {
+				tui.Err(err.Error())
+				os.Exit(1)
+			}
+		}
+		tui.OK("valid release tag v" + v.String())
 	case "tag", "push":
+		if len(args) != 2 {
+			releaseUsage()
+			os.Exit(2)
+		}
 		v, err := versioning.Parse(args[1])
 		if err != nil {
 			tui.Err(err.Error())
@@ -325,9 +462,164 @@ func cmdRelease(args []string) {
 		}
 		tui.OK("created " + tag)
 	default:
-		tui.Err("usage: kt release next <patch|minor|major> | tag <version> | push <version>")
+		releaseUsage()
 		os.Exit(2)
 	}
+}
+
+type releaseOptions struct {
+	preLabel     string
+	json         bool
+	githubOutput bool
+	err          error
+}
+
+type releasePlan struct {
+	Current     string `json:"current"`
+	Next        string `json:"next"`
+	Tag         string `json:"tag"`
+	Prerelease  bool   `json:"prerelease"`
+	Dirty       bool   `json:"dirty"`
+	LocalTag    string `json:"local_tag"`
+	RemoteTag   string `json:"remote_tag"`
+	RemoteError string `json:"remote_error,omitempty"`
+}
+
+func releaseUsage() {
+	tui.Err("usage: kt release next <patch|minor|major|pre|stable> [--pre rc] | plan <patch|minor|major|version> [--pre rc] [--json] | validate <vversion> [--github-output] | tag|push <version>")
+}
+
+func parseReleaseOptions(args []string) releaseOptions {
+	var opts releaseOptions
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--pre":
+			i++
+			if i >= len(args) || strings.TrimSpace(args[i]) == "" {
+				opts.err = fmt.Errorf("--pre requires a label")
+				return opts
+			}
+			opts.preLabel = args[i]
+		case "--json":
+			opts.json = true
+		case "--github-output":
+			opts.githubOutput = true
+		default:
+			opts.err = fmt.Errorf("unknown release option %q", args[i])
+			return opts
+		}
+	}
+	return opts
+}
+
+func nextRelease(kind, preLabel string) (versioning.Version, error) {
+	current, err := latestReleaseVersion()
+	if err != nil {
+		return versioning.Version{}, err
+	}
+	switch kind {
+	case "pre":
+		if current.Pre == "" {
+			return versioning.Version{}, fmt.Errorf("latest release is stable; use patch|minor|major --pre <label>")
+		}
+		current.PreN++
+		return current, nil
+	case "stable":
+		if current.Pre == "" {
+			return versioning.Version{}, fmt.Errorf("latest release is already stable")
+		}
+		current.Pre = ""
+		current.PreN = 0
+		return current, nil
+	default:
+		next, err := current.Next(kind)
+		if err != nil {
+			return versioning.Version{}, err
+		}
+		if preLabel != "" {
+			next.Pre = preLabel
+			next.PreN = 1
+		}
+		return next, nil
+	}
+}
+
+func buildReleasePlan(input, preLabel string) (releasePlan, error) {
+	current, err := latestReleaseVersion()
+	if err != nil {
+		return releasePlan{}, err
+	}
+	next, err := versioning.Parse(input)
+	if err != nil {
+		next, err = nextRelease(input, preLabel)
+		if err != nil {
+			return releasePlan{}, err
+		}
+	} else if preLabel != "" {
+		next.Pre = preLabel
+		next.PreN = 1
+	}
+	tag := "v" + next.String()
+	dirty, _ := gitOutput("status", "--porcelain")
+	plan := releasePlan{
+		Current:    current.String(),
+		Next:       next.String(),
+		Tag:        tag,
+		Prerelease: next.Pre != "",
+		Dirty:      strings.TrimSpace(dirty) != "",
+		LocalTag:   "available",
+		RemoteTag:  "available",
+	}
+	if err := gitRunQuiet("show-ref", "--verify", "--quiet", "refs/tags/"+tag); err == nil {
+		plan.LocalTag = "exists"
+	}
+	remote, err := gitOutput("ls-remote", "--tags", "origin", "refs/tags/"+tag)
+	if err != nil {
+		plan.RemoteTag = "unknown"
+		plan.RemoteError = err.Error()
+	} else if strings.TrimSpace(remote) != "" {
+		plan.RemoteTag = "exists"
+	}
+	return plan, nil
+}
+
+func printReleasePlan(plan releasePlan) {
+	tui.Header("Release plan")
+	tui.Table([]string{"field", "value"}, [][]string{
+		{"current", plan.Current},
+		{"next", plan.Next},
+		{"tag", plan.Tag},
+		{"prerelease", fmt.Sprintf("%t", plan.Prerelease)},
+		{"dirty", fmt.Sprintf("%t", plan.Dirty)},
+		{"local tag", plan.LocalTag},
+		{"remote tag", plan.RemoteTag},
+	})
+	if plan.RemoteError != "" {
+		tui.Warn("remote tag check: " + plan.RemoteError)
+	}
+	tui.Info("next: kt release push " + plan.Next)
+}
+
+func parseReleaseTag(tag string) (versioning.Version, error) {
+	if !strings.HasPrefix(tag, "v") {
+		return versioning.Version{}, fmt.Errorf("release tag must be v<semver>")
+	}
+	return versioning.Parse(strings.TrimPrefix(tag, "v"))
+}
+
+func appendGitHubOutput(version string, prerelease bool) error {
+	out := os.Getenv("GITHUB_OUTPUT")
+	if out == "" {
+		fmt.Printf("version=%s\nprerelease=%t\n", version, prerelease)
+		return nil
+	}
+	f, err := os.OpenFile(out, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = fmt.Fprintf(f, "version=%s\nprerelease=%t\n", version, prerelease)
+	return err
 }
 
 func latestReleaseVersion() (versioning.Version, error) {
@@ -380,6 +672,11 @@ func gitRun(args ...string) error {
 	cmd := exec.Command("git", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func gitRunQuiet(args ...string) error {
+	cmd := exec.Command("git", args...)
 	return cmd.Run()
 }
 
@@ -517,4 +814,13 @@ func initNextHint(dir string) string {
 	}
 	steps = append(steps, "make package")
 	return strings.Join(steps, " && ")
+}
+
+func writeJSON(v any) {
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(v); err != nil {
+		tui.Err(err.Error())
+		os.Exit(1)
+	}
 }

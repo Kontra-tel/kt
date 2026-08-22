@@ -23,18 +23,7 @@ jobs:
         id: release
         env:
           TAG: ${{ github.ref_name }}
-        run: |
-          VERSION="${TAG#v}"
-          if [ "$TAG" = "$VERSION" ] || ! printf '%s' "$VERSION" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+\.[1-9][0-9]*)?$'; then
-            echo "release tags must be v<semver>, such as v1.3.0 or v1.4.0-rc.1" >&2
-            exit 1
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          if [[ "$VERSION" == *-* ]]; then
-            echo "prerelease=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
-          fi
+        run: go run ./cmd/kt release validate "${TAG}" --github-output
 
       - name: Test
         run: go test ./...

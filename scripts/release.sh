@@ -7,6 +7,10 @@ VERSION="${VERSION:-${TAG#v}}"
 if [ -z "$VERSION" ] || [ "$VERSION" = "$TAG" ]; then
   VERSION="0.0.0-dev.${COMMIT}"
 fi
+VERSION="${VERSION#v}"
+if [[ "$VERSION" != 0.0.0-dev.* ]]; then
+  go run ./cmd/kt release validate "v${VERSION}" >/dev/null
+fi
 mkdir -p dist
 for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
   GOOS="${target%/*}"

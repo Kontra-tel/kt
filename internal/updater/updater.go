@@ -1,6 +1,9 @@
 package updater
 
 import (
+	"bufio"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -138,9 +141,71 @@ func Apply(apiBase string, includePrerelease bool) error {
 	if err := tmp.Chmod(0755); err != nil {
 		return err
 	}
-	tmp.Close()
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := verifyChecksum(r, want, tmpPath); err != nil {
+		return err
+	}
 
 	return os.Rename(tmpPath, exe)
+}
+
+func verifyChecksum(r Release, assetName, path string) error {
+	var sumsURL string
+	for _, a := range r.Assets {
+		if a.Name == "SHA256SUMS" {
+			sumsURL = a.BrowserDownloadURL
+			break
+		}
+	}
+	if sumsURL == "" {
+		return fmt.Errorf("release %s has no SHA256SUMS asset", r.TagName)
+	}
+	resp, err := http.Get(sumsURL)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("checksum download returned %s", resp.Status)
+	}
+	want := ""
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) >= 2 && fields[1] == assetName {
+			want = fields[0]
+			break
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	if want == "" {
+		return fmt.Errorf("SHA256SUMS has no checksum for %s", assetName)
+	}
+	got, err := fileSHA256(path)
+	if err != nil {
+		return err
+	}
+	if !strings.EqualFold(got, want) {
+		return fmt.Errorf("checksum mismatch for %s", assetName)
+	}
+	return nil
+}
+
+func fileSHA256(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // ExecutablePath returns the real path of the running binary, resolving symlinks.

@@ -53,6 +53,7 @@ Run `kt update-tools` in an existing project after upgrading `kt` to refresh the
 
 `.kt/project.yaml` is created by `kt init` and holds the project contract used by Make, nFPM, and `kt` itself. The key fields are:
 
+- `schema`: project manifest schema (`kt.project/v1` for new scaffolds)
 - `template`: scaffold template name as chosen by the user
 - `app`: package / application name
 - `kind`: `cli`, `service`, `mixed`, or `multi-service`
@@ -65,6 +66,7 @@ kt config show --json       # print normalized project contract as JSON
 kt config shape             # print kind-aware summary from .kt/project.yaml
 kt config get <key>         # print a single value (used by Makefile: APP := $(shell kt config get app))
 kt config set <key> <value> # update a value in .kt/project.yaml
+kt config validate         # check app/kind/services/user/group consistency
 ```
 
 ### Deploy config
@@ -77,16 +79,36 @@ kt config diff    # diff each *.example against its actual counterpart
 
 These delegate to the `config-init`, `config-check`, and `config-diff` Make targets.
 
+## kt deploy
+
+Inspect and validate generated deploy files against `.kt/project.yaml`.
+
+```bash
+kt deploy inspect
+kt deploy inspect --json
+kt deploy check
+kt deploy check --json
+```
+
+`check` verifies the project manifest, `nfpm.yaml`, deploy config examples,
+service runners, systemd units, expected `ExecStart` paths, executable bits,
+and stale lifecycle scripts.
+
 ## kt release
 
 Create immutable annotated release tags. Releases and deployment workflows should
 trigger from pushed `v<semver>` tags.
 
 ```bash
-kt release next patch      # prints the next version from the latest reachable tag
-kt release tag 1.3.0       # create local annotated tag v1.3.0 at HEAD
-kt release push 1.3.0      # create and push v1.3.0
-kt release push 1.3.0-rc.1 # create and push a prerelease tag
+kt release next patch              # prints the next stable patch version
+kt release next minor --pre rc     # prints the first RC for the next minor
+kt release next pre                # increments the current prerelease number
+kt release next stable             # promotes the current prerelease to stable
+kt release plan minor              # preview tag, dirty state, and tag conflicts
+kt release plan 1.4.0-rc.1 --json  # machine-readable release plan
+kt release validate v1.4.0         # strict tag validation for CI
+kt release tag 1.4.0               # create local annotated tag v1.4.0 at HEAD
+kt release push 1.4.0              # create and push v1.4.0
 ```
 
 `tag` and `push` require a clean working tree, reject invalid SemVer versions,
