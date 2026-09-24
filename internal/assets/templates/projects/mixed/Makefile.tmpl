@@ -9,7 +9,7 @@ include .kt/mk/config.mk
 include .kt/mk/doctor.mk
 include .kt/mk/nfpm.mk
 
-.PHONY: test build-cli build-service build run run-service print-info install
+.PHONY: test build-cli build-service build run run-service print-info install verify
 
 test: ## Run CLI and service tests
 	@echo "TODO: add CLI test command"
@@ -35,3 +35,6 @@ print-info: ## Show packaged service metadata
 	@sh deploy/bin/$(APP)-service
 
 install: local-install ## Install package on this machine
+
+verify: config-check ## Validate the manifest, deploy files, and package mappings
+	@kt deploy check --strict

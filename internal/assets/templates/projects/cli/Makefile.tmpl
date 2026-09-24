@@ -15,7 +15,7 @@ include .kt/mk/nfpm.mk
 
 # ── Project targets ────────────────────────────────────────────────────────────
 
-.PHONY: test build run install
+.PHONY: test build run install verify
 
 test: ## Run tests
 	@echo "TODO: add your test command"
@@ -30,3 +30,6 @@ run: build ## Run locally
 	@sh deploy/bin/$(APP)
 
 install: local-install ## Install package on this machine
+
+verify: config-check ## Validate the manifest, deploy files, and package mappings
+	@kt deploy check --strict

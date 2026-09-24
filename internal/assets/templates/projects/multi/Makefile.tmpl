@@ -15,7 +15,7 @@ include .kt/mk/nfpm.mk
 
 # ── Project targets ────────────────────────────────────────────────────────────
 
-.PHONY: test build-backend build-frontend build run-backend run-frontend print-info install
+.PHONY: test build-backend build-frontend build run-backend run-frontend print-info install verify
 
 test: ## Run backend and frontend tests
 	@echo "TODO: add backend test command"
@@ -43,3 +43,6 @@ print-info: ## Show packaged service metadata
 	@sh deploy/bin/$(APP)
 
 install: local-install ## Install package on this machine
+
+verify: config-check ## Validate the manifest, deploy files, and package mappings
+	@kt deploy check --strict

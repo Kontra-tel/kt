@@ -14,6 +14,17 @@ kt release push 1.4.0
 
 The `plan` command previews the current reachable release, next version, tag, dirty state, and local/remote tag conflicts. The `push` command requires a clean working tree and refuses a version that is already tagged locally or on `origin`. It never changes source files.
 
+### Tag prefixes
+
+When a project has `.kt/project.yaml`, release commands use `release.tag_prefix` rather than assuming `v`. New scaffolds default to `v`, preserving tags such as `v1.5.0`.
+
+```yaml
+release:
+  tag_prefix: release-
+```
+
+With that configuration, `kt release tag 1.5.0` creates `release-1.5.0`, and `release validate release-1.5.0` validates it. The prefix must match `[A-Za-z][A-Za-z0-9._-]*`. Use `--dir DIR` with release commands in a monorepo or CI workspace.
+
 ### Release notes
 
 `kt release notes` prints Markdown bullets from `git log --oneline`.

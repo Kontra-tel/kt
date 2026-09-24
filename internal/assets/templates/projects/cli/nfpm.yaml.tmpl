@@ -1,14 +1,5 @@
 # nFPM package manifest — https://nfpm.goreleaser.com/configuration/
-#
-# Build packages with:
-#   make package          — build for the native package manager and arch
-#   make package-deb      — .deb only
-#   make package-rpm      — .rpm only
-#
-# APP, ARCH, and VERSION are injected by nfpm.mk at build time:
-#   APP     — from .kt/project.yaml via `kt config get app`
-#   ARCH    — host architecture (amd64, arm64, …)
-#   VERSION — version derived from the release tag or supplied by CI
+# APP, ARCH, and VERSION are injected by nfpm.mk at build time.
 
 name: ${APP}
 arch: ${ARCH}
@@ -20,6 +11,9 @@ maintainer: {{.Author}}
 description: ${APP} command-line application
 
 contents:
+  # kt owns only the entries between these markers.
+  # Add custom package entries after the closing marker.
+  # kt:contents:start
   - src: dist/app
     dst: /usr/lib/{{.App}}
 
@@ -31,3 +25,5 @@ contents:
   - src: deploy/config/*.example
     dst: /etc/{{.App}}/
     type: config|noreplace
+
+  # kt:contents:end

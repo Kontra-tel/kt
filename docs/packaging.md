@@ -18,6 +18,12 @@ NFPM_PACKAGER=archlinux make package
 NFPM_ARCH=arm64 make package     # cross-package for a different architecture
 ```
 
+```bash
+make config-init && make verify  # verify config, deploy assets, and nFPM mappings
+```
+
+`verify` does not run the scaffold's placeholder application tests. It runs `config-check` and `kt deploy check --strict`.
+
 ## Supported package managers
 
 Auto-detection checks for `dpkg`, then `rpm`, then `pacman` on PATH and picks accordingly.
@@ -41,6 +47,12 @@ make config-diff    # diff example vs actual to spot drift
 Config files are placed under `deploy/config/`. When packaged with nFPM, the example is installed to `/etc/<app>/app.env.example` with `type: config|noreplace` so upgrades never overwrite a live config.
 
 The postinstall script copies the example to `app.env` on first install if the file does not already exist.
+
+## Manifest-derived package mappings
+
+`kt deploy plan` prints the package mappings derived from `.kt/project.yaml`; `kt deploy check` requires matching entries in `nfpm.yaml`. This catches commands, runners, units, and config examples that are present in the repository but absent from the package.
+
+New 1.5 scaffolds own only the entries between `kt:contents:start` and `kt:contents:end` inside the `contents:` sequence. Add custom package entries after the closing marker. Use `kt deploy sync --dry-run` to review a unified diff and `kt deploy sync` to refresh the generated entries. Existing manifests without markers are never rewritten automatically; see [1.5 migration](migration-1.5.md).
 
 ## Filesystem layout
 

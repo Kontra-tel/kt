@@ -9,7 +9,17 @@ import (
 func TestCheckProjectCLI(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, ".kt", "project.yaml"), "template: cli\napp: tool\nkind: cli\nservices:\n")
-	writeFile(t, filepath.Join(root, "nfpm.yaml"), "name: ${APP}\n")
+	writeFile(t, filepath.Join(root, "nfpm.yaml"), `contents:
+  - src: dist/app
+    dst: /usr/lib/tool
+  - src: deploy/bin/tool
+    dst: /usr/bin/tool
+    file_info:
+      mode: 0755
+  - src: deploy/config/*.example
+    dst: /etc/tool/
+    type: config|noreplace
+`)
 	writeFile(t, filepath.Join(root, "deploy", "config", "app.env.example"), "APP_ENV=production\n")
 	writeExec(t, filepath.Join(root, "deploy", "bin", "tool"), "#!/bin/sh\n")
 

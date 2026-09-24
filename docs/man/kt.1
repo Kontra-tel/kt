@@ -1,4 +1,4 @@
-.TH KT 1 "2026-08-22" "kt 1.4" "User Commands"
+.TH KT 1 "2026-09-24" "kt 1.5" "User Commands"
 .SH NAME
 kt \- scaffold Make, nFPM, systemd, and tag-based release projects
 .SH SYNOPSIS
@@ -38,7 +38,7 @@ List available project templates.
 .B kt init
 Start an interactive scaffold prompt.
 .TP
-.B kt init \fItemplate\fR \fIapp\fR [\-\-dir \fIdir\fR] [\-\-force] [\-\-dry-run]
+.B kt init \fItemplate\fR \fIapp\fR [\-\-dir \fIdir\fR] [\-\-maintainer \fIvalue\fR] [\-\-service-user \fIname\fR] [\-\-service-group \fIname\fR] [\-\-force] [\-\-dry-run]
 Create a project from a template. Supported templates are
 .BR service ,
 .BR cli ,
@@ -46,16 +46,19 @@ Create a project from a template. Supported templates are
 .BR multi ,
 and legacy
 .BR app .
+
+.PP
+The maintainer and service account options make explicit scaffolding reproducible without local Git configuration.
 .TP
-.B kt config get \fIkey\fR
+.B kt config [\-\-dir \fIdir\fR] get \fIkey\fR
 Print one value from
 .IR .kt/project.yaml .
 .TP
-.B kt config set \fIkey\fR \fIvalue\fR
+.B kt config [\-\-dir \fIdir\fR] set \fIkey\fR \fIvalue\fR
 Update or append a top-level scalar value in
 .IR .kt/project.yaml .
 .TP
-.B kt config show [\-\-json]
+.B kt config [\-\-dir \fIdir\fR] show [\-\-json]
 Print the project manifest. With
 .BR \-\-json ,
 prints the normalized contract as JSON.
@@ -89,24 +92,47 @@ format.
 .B kt config init|diff|check
 Delegate to the generated Make config targets for
 .IR deploy/config .
+
+.PP
+All config commands accept
+.BR \-\-dir .
+Nested scalar values, including
+.BR release.tag_prefix ,
+are available through dot notation with
+.BR get .
 .SS Deploy commands
 .TP
-.B kt deploy inspect [\-\-json]
-Print deploy metadata derived from
-.IR .kt/project.yaml ,
-including structured services, config/data/log directories, unit names, and
-installed runner paths.
+.B kt deploy [\-\-dir \fIdir\fR] inspect [\-\-json]
+Print runtime deploy metadata derived from
+.IR .kt/project.yaml .
 .TP
-.B kt deploy metadata [\-\-json] [\-\-output \fIfile\fR]
+.B kt deploy [\-\-dir \fIdir\fR] plan [\-\-json]
+Print manifest-derived nFPM source-to-destination mappings for application artifacts,
+declared commands, service runners, units, and config examples.
+.TP
+.B kt deploy [\-\-dir \fIdir\fR] metadata [\-\-json] [\-\-output \fIfile\fR]
 Print deploy metadata as JSON, or write it to a file.
 .TP
-.B kt deploy check [\-\-json]
-Validate the project manifest, package manifest, config examples, service
-runners, systemd units, unit entrypoints, executable bits, and stale lifecycle
-scripts.
+.B kt deploy [\-\-dir \fIdir\fR] check [\-\-strict] [\-\-json]
+Validate the project manifest, every declared command, package mappings, config
+examples, service runners, systemd units, unit entrypoints, executable bits, and
+stale lifecycle scripts. With
+.BR \-\-strict ,
+warnings also fail the command.
+.TP
+.B kt deploy [\-\-dir \fIdir\fR] sync [\-\-dry-run]
+Refresh only the generated entries between
+.B kt:contents:start
+and
+.B kt:contents:end
+in
+.IR nfpm.yaml .
+With
+.BR \-\-dry-run ,
+print a unified diff without writing.
 .SS Release commands
 .TP
-.B kt release next patch|minor|major [\-\-pre \fIlabel\fR]
+.B kt release [\-\-dir \fIdir\fR] next patch|minor|major [\-\-pre \fIlabel\fR]
 Print the next stable version, or the first prerelease when
 .B \-\-pre
 is supplied.
@@ -117,18 +143,22 @@ Increment the current prerelease number.
 .B kt release next stable
 Promote the current prerelease to a stable version.
 .TP
-.B kt release plan patch|minor|major|\fIversion\fR [\-\-pre \fIlabel\fR] [\-\-json]
+.B kt release [\-\-dir \fIdir\fR] plan patch|minor|major|\fIversion\fR [\-\-pre \fIlabel\fR] [\-\-json]
 Preview the current release, next version, tag, dirty state, and local/remote
 tag conflicts.
 .TP
-.B kt release notes [\fIrange\fR|\-\-since latest]
+.B kt release [\-\-dir \fIdir\fR] notes [\fIrange\fR|\-\-since latest]
 Print Markdown bullet release notes from
 .B git log --oneline .
 .TP
-.B kt release validate \fIvversion\fR [\-\-github-output]
+.B kt release [\-\-dir \fIdir\fR] validate \fItag\fR [\-\-github-output]
 Validate a strict
-.B v<semver>
-tag. With
+.B <tag_prefix><semver>
+tag. The prefix is read from
+.BR release.tag_prefix
+and defaults to
+.BR v .
+With
 .BR \-\-github-output ,
 writes
 .B version
@@ -136,10 +166,10 @@ and
 .B prerelease
 outputs for CI.
 .TP
-.B kt release tag \fIversion\fR
-Create an immutable annotated local tag at HEAD.
+.B kt release [\-\-dir \fIdir\fR] tag \fIversion\fR
+Create an immutable annotated local tag at HEAD using the configured prefix.
 .TP
-.B kt release push \fIversion\fR
+.B kt release [\-\-dir \fIdir\fR] push \fIversion\fR
 Create and push an immutable annotated tag to
 .BR origin .
 .SS Tooling commands
@@ -166,8 +196,10 @@ Update the
 binary from Gitea releases. Downloads are verified against
 .BR SHA256SUMS .
 .TP
-.B kt doctor
-Run generated project doctor checks.
+.B kt doctor [\-\-dir \fIdir\fR] [\-\-json]
+Run generated project doctor checks. With
+.BR \-\-json ,
+report each required tool's resolved path, version, and availability.
 .TP
 .B kt version
 Print kt version, commit, and build date.

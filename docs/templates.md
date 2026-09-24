@@ -71,6 +71,24 @@ This split keeps service packages safe to inspect manually while giving the serv
 
 `kt deploy metadata --json` emits the same deploy contract used for `deploy.json`.
 
+## Package plan and ownership
+
+`kt deploy plan` derives package paths from the normalized manifest. New scaffolds keep the generated nFPM entries between these markers:
+
+```yaml
+contents:
+  # kt:contents:start
+  # generated command, runner, unit, config, and artifact entries
+  # kt:contents:end
+  # User-owned package entries go here.
+```
+
+Run `kt deploy sync --dry-run` to inspect the generated block and `kt deploy sync` to refresh it. Sync never edits content outside the markers. Existing projects without the markers remain valid for `kt deploy check`; add the markers using the [1.5 migration](migration-1.5.md) before syncing.
+
+Generated `Makefile` build and test targets, deploy runners, local hook examples, and entries below the marker are user-owned. `.kt/mk/` is kt-owned and updated by `kt update-tools`.
+
+Run `make config-init && make verify` after adapting a scaffold. `verify` requires config files derived from examples and runs `kt deploy check --strict`; it intentionally does not run the placeholder application test target.
+
 ## Deploy layout
 
 ### `cli`

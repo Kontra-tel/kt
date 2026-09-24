@@ -2,8 +2,9 @@ SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
 
 APP ?= $(shell kt config get app 2>/dev/null)
-# Releases derive their version from an exact v<semver> tag. Override VERSION for local builds.
-VERSION ?= $(shell tag=$$(git describe --tags --exact-match HEAD 2>/dev/null || true); if [[ $$tag =~ ^v ]]; then printf '%s' "$${tag#v}"; else printf '0.0.0-dev.%s' "$$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"; fi)
+RELEASE_TAG_PREFIX ?= $(shell kt config get release.tag_prefix 2>/dev/null || echo v)
+# Releases derive their version from an exact <tag_prefix><semver> tag. Override VERSION for local builds.
+VERSION ?= $(shell prefix="$(RELEASE_TAG_PREFIX)"; tag=$$(git describe --tags --exact-match HEAD 2>/dev/null || true); if [[ $$tag == "$$prefix"* ]]; then printf '%s' "$${tag#"$$prefix"}"; else printf '0.0.0-dev.%s' "$$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"; fi)
 DIST_DIR ?= dist
 DEPLOY_DIR ?= deploy
 BUILD_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)

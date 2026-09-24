@@ -12,6 +12,7 @@ import (
 
 	"git.kontra.tel/kontra.tel/Kt/internal/assets"
 	"git.kontra.tel/kontra.tel/Kt/internal/deploycheck"
+	"git.kontra.tel/kontra.tel/Kt/internal/doctor"
 	"git.kontra.tel/kontra.tel/Kt/internal/ktconfig"
 	"git.kontra.tel/kontra.tel/Kt/internal/scaffold"
 	"git.kontra.tel/kontra.tel/Kt/internal/tui"
@@ -52,7 +53,7 @@ func main() {
 	case "release":
 		cmdRelease(args[1:])
 	case "doctor":
-		cmdDoctor()
+		cmdDoctor(args[1:])
 	case "update":
 		cmdUpdate(args[1:])
 	case "version":
@@ -137,25 +138,24 @@ func usageTopic(args []string) {
 	switch args[0] {
 	case "init":
 		tui.Header("kt init")
-		fmt.Println("  kt init [template] [app] [--dir DIR] [--force] [--dry-run]")
+		fmt.Println("  kt init [template] [app] [--dir DIR] [--maintainer VALUE] [--service-user NAME] [--service-group NAME] [--force] [--dry-run]")
 		fmt.Println("  interactive when template or app is omitted")
 	case "config":
 		tui.Header("kt config")
-		fmt.Println("  kt config get <key> | set <key> <value> | show [--json] | shape | validate")
-		fmt.Println("  kt config edit | schema | migrate --to kt.project/v1")
-		fmt.Println("  kt config init | diff | check")
+		fmt.Println("  kt config [--dir DIR] get <key> | set <key> <value> | show [--json] | shape | validate")
+		fmt.Println("  kt config edit | schema | migrate --to kt.project/v1 | init|diff|check")
 	case "deploy":
 		tui.Header("kt deploy")
-		fmt.Println("  kt deploy inspect [--json]")
-		fmt.Println("  kt deploy metadata [--json] [--output FILE]")
-		fmt.Println("  kt deploy check [--json]")
+		fmt.Println("  kt deploy [--dir DIR] inspect|plan [--json]")
+		fmt.Println("  kt deploy [--dir DIR] metadata [--json] [--output FILE]")
+		fmt.Println("  kt deploy [--dir DIR] check [--strict] [--json] | sync [--dry-run]")
 	case "release":
 		tui.Header("kt release")
-		fmt.Println("  kt release next <patch|minor|major|pre|stable> [--pre rc]")
-		fmt.Println("  kt release plan <kind|version> [--pre rc] [--json]")
-		fmt.Println("  kt release notes [range|--since latest]")
-		fmt.Println("  kt release validate <vversion> [--github-output]")
-		fmt.Println("  kt release tag|push <version>")
+		fmt.Println("  kt release [--dir DIR] next <patch|minor|major|pre|stable> [--pre rc]")
+		fmt.Println("  kt release [--dir DIR] plan <kind|version> [--pre rc] [--json]")
+		fmt.Println("  kt release [--dir DIR] notes [range|--since latest]")
+		fmt.Println("  kt release [--dir DIR] validate <tag> [--github-output]")
+		fmt.Println("  kt release [--dir DIR] tag|push <version>")
 	case "completion":
 		tui.Header("kt completion")
 		fmt.Println("  kt completion bash|zsh|fish")
@@ -177,6 +177,9 @@ func cmdInit(s scaffold.Scaffolder, args []string) {
 	var positional []string
 	dir := "."
 	dirSet := false
+	maintainer := ""
+	serviceUser := ""
+	serviceGroup := ""
 	force := false
 	dryRun := false
 	for i := 0; i < len(args); i++ {
@@ -184,9 +187,25 @@ func cmdInit(s scaffold.Scaffolder, args []string) {
 		switch a {
 		case "--dir":
 			i++
-			if i < len(args) {
-				dir = args[i]
-				dirSet = true
+			if i >= len(args) {
+				tui.Err("--dir requires a directory")
+				os.Exit(2)
+			}
+			dir = args[i]
+			dirSet = true
+		case "--maintainer", "--service-user", "--service-group":
+			i++
+			if i >= len(args) || strings.TrimSpace(args[i]) == "" {
+				tui.Err(a + " requires a value")
+				os.Exit(2)
+			}
+			switch a {
+			case "--maintainer":
+				maintainer = args[i]
+			case "--service-user":
+				serviceUser = args[i]
+			case "--service-group":
+				serviceGroup = args[i]
 			}
 		case "--force":
 			force = true
@@ -219,12 +238,21 @@ func cmdInit(s scaffold.Scaffolder, args []string) {
 		os.Exit(1)
 	}
 
-	ctx := scaffold.Context{Template: tmplName, App: appName}
+	ctx := scaffold.Context{Template: tmplName, App: appName, Author: maintainer, ServiceUser: serviceUser, ServiceGroup: serviceGroup}
 	if interactive {
-		ctx.Author = tui.Input("Package maintainer", defaultMaintainer())
+		if ctx.Author == "" {
+			ctx.Author = defaultMaintainer()
+		}
+		ctx.Author = tui.Input("Package maintainer", ctx.Author)
 		if templateHasService(tmplName) {
-			ctx.ServiceUser = tui.Input("Service user", appName)
-			ctx.ServiceGroup = tui.Input("Service group", ctx.ServiceUser)
+			if ctx.ServiceUser == "" {
+				ctx.ServiceUser = appName
+			}
+			ctx.ServiceUser = tui.Input("Service user", ctx.ServiceUser)
+			if ctx.ServiceGroup == "" {
+				ctx.ServiceGroup = ctx.ServiceUser
+			}
+			ctx.ServiceGroup = tui.Input("Service group", ctx.ServiceGroup)
 		}
 		tui.Header("Create project")
 		tui.Table([]string{"field", "value"}, [][]string{
@@ -313,16 +341,56 @@ func cmdCompletion(args []string) {
 		tui.Err("usage: kt completion bash|zsh|fish")
 		os.Exit(2)
 	}
-	commands := strings.Join(rootCommands(), " ")
 	switch args[0] {
 	case "bash":
-		fmt.Printf("_kt_complete() {\n  local cur=\"${COMP_WORDS[COMP_CWORD]}\"\n  COMPREPLY=( $(compgen -W %q -- \"$cur\") )\n}\ncomplete -F _kt_complete kt\n", commands)
+		fmt.Print(`_kt_complete() {
+  local cur="${COMP_WORDS[COMP_CWORD]}" prev="${COMP_WORDS[COMP_CWORD-1]}" command="${COMP_WORDS[1]}"
+  local options="init templates install-tools update-tools config deploy release completion doctor update version help"
+  case "$prev" in
+    init) options="app cli mixed multi service --dir --maintainer --service-user --service-group --force --dry-run" ;;
+    config) options="get set show shape validate edit schema migrate init diff check --dir" ;;
+    deploy) options="inspect metadata plan check sync --dir --strict --dry-run --output" ;;
+    release) options="next plan notes validate tag push --dir" ;;
+    completion) options="bash zsh fish" ;;
+    update) options="--check --prerelease" ;;
+  esac
+  if [[ "$command" == "release" && "$prev" == "next" ]]; then options="patch minor major pre stable --pre"; fi
+  COMPREPLY=( $(compgen -W "$options" -- "$cur") )
+}
+complete -F _kt_complete kt
+`)
 	case "zsh":
-		fmt.Printf("#compdef kt\n_arguments '1:command:(%s)'\n", commands)
+		fmt.Print(`#compdef kt
+_arguments '1:command:(init templates install-tools update-tools config deploy release completion doctor update version help)' '2:subcommand:->subcommand' '*:argument:->arguments'
+case $words[2] in
+  init) _arguments '--dir[Target directory]:directory:_files -/' '--maintainer[Package maintainer]:' '--service-user[Service user]:' '--service-group[Service group]:' '--force' '--dry-run' ;;
+  config) _arguments '--dir[Project directory]:directory:_files -/' '1:command:(get set show shape validate edit schema migrate init diff check)' ;;
+  deploy) _arguments '--dir[Project directory]:directory:_files -/' '1:command:(inspect metadata plan check sync)' '--strict' '--dry-run' '--output[Metadata output file]:file:_files' ;;
+  release) _arguments '--dir[Project directory]:directory:_files -/' '1:command:(next plan notes validate tag push)' ;;
+  completion) _arguments '1:shell:(bash zsh fish)' ;;
+esac
+`)
 	case "fish":
 		for _, command := range rootCommands() {
 			fmt.Printf("complete -c kt -f -a %s\n", command)
 		}
+		fmt.Print(`complete -c kt -n '__fish_seen_subcommand_from init' -a 'app cli mixed multi service'
+complete -c kt -n '__fish_seen_subcommand_from init' -l dir -r
+complete -c kt -n '__fish_seen_subcommand_from init' -l maintainer -r
+complete -c kt -n '__fish_seen_subcommand_from init' -l service-user -r
+complete -c kt -n '__fish_seen_subcommand_from init' -l service-group -r
+complete -c kt -n '__fish_seen_subcommand_from init' -l force
+complete -c kt -n '__fish_seen_subcommand_from init' -l dry-run
+complete -c kt -n '__fish_seen_subcommand_from config' -a 'get set show shape validate edit schema migrate init diff check'
+complete -c kt -n '__fish_seen_subcommand_from deploy' -a 'inspect metadata plan check sync'
+complete -c kt -n '__fish_seen_subcommand_from deploy' -l dir -r
+complete -c kt -n '__fish_seen_subcommand_from deploy' -l strict
+complete -c kt -n '__fish_seen_subcommand_from deploy' -l dry-run
+complete -c kt -n '__fish_seen_subcommand_from deploy' -l output -r
+complete -c kt -n '__fish_seen_subcommand_from release' -a 'next plan notes validate tag push'
+complete -c kt -n '__fish_seen_subcommand_from release' -l dir -r
+complete -c kt -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish'
+`)
 	default:
 		tui.Err("usage: kt completion bash|zsh|fish")
 		os.Exit(2)
@@ -482,8 +550,19 @@ func dryRunInit(s scaffold.Scaffolder, dir string, ctx scaffold.Context, force b
 }
 
 func cmdConfig(args []string) {
+	dir, args, err := extractDirOption(args)
+	if err != nil {
+		tui.Err(err.Error())
+		os.Exit(2)
+	}
+	restore, err := enterDir(dir)
+	if err != nil {
+		tui.Err(err.Error())
+		os.Exit(1)
+	}
+	defer restore()
 	if len(args) < 1 {
-		tui.Err("usage: kt config get <key> | set <key> <value> | show [--json] | shape | validate | edit | schema | migrate --to kt.project/v1 | init|diff|check")
+		tui.Err("usage: kt config [--dir DIR] get <key> | set <key> <value> | show [--json] | shape | validate | edit | schema | migrate --to kt.project/v1 | init|diff|check")
 		os.Exit(2)
 	}
 	switch args[0] {
@@ -759,6 +838,37 @@ func hasArg(args []string, want string) bool {
 	return false
 }
 
+func extractDirOption(args []string) (string, []string, error) {
+	dir := "."
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		if args[i] != "--dir" {
+			out = append(out, args[i])
+			continue
+		}
+		i++
+		if i >= len(args) || strings.TrimSpace(args[i]) == "" {
+			return "", nil, fmt.Errorf("--dir requires a directory")
+		}
+		dir = args[i]
+	}
+	return dir, out, nil
+}
+
+func enterDir(dir string) (func(), error) {
+	if dir == "." {
+		return func() {}, nil
+	}
+	original, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	if err := os.Chdir(dir); err != nil {
+		return nil, err
+	}
+	return func() { _ = os.Chdir(original) }, nil
+}
+
 func serviceWithDefaults(project ktconfig.Project, service ktconfig.Service) ktconfig.Service {
 	if service.Runner == "" && service.Name != "" {
 		service.Runner = filepath.Join("deploy", "run", service.Name)
@@ -779,8 +889,13 @@ func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
 func cmdDeploy(args []string) {
+	dir, args, err := extractDirOption(args)
+	if err != nil {
+		tui.Err(err.Error())
+		os.Exit(2)
+	}
 	if len(args) < 1 {
-		tui.Err("usage: kt deploy inspect [--json] | metadata [--json] [--output FILE] | check [--json]")
+		tui.Err("usage: kt deploy [--dir DIR] inspect|plan [--json] | metadata [--json] [--output FILE] | check [--strict] [--json] | sync [--dry-run]")
 		os.Exit(2)
 	}
 	jsonOut := globalJSON || hasArg(args[1:], "--json")
@@ -788,7 +903,7 @@ func cmdDeploy(args []string) {
 	case "help", "--help", "-h":
 		usageTopic([]string{"deploy"})
 	case "inspect":
-		info, err := deploycheck.Inspect(".")
+		info, err := deploycheck.Inspect(dir)
 		if err != nil {
 			tui.Err(err.Error())
 			os.Exit(1)
@@ -806,8 +921,24 @@ func cmdDeploy(args []string) {
 			{"data", info.DataDir},
 			{"logs", info.LogDir},
 		})
+	case "plan":
+		plan, err := deploycheck.PlanProject(dir)
+		if err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
+		if jsonOut {
+			writeJSON(plan)
+			return
+		}
+		rows := make([][]string, 0, len(plan.Entries))
+		for _, entry := range plan.Entries {
+			rows = append(rows, []string{entry.Source, entry.Destination, entry.Type, modeText(entry.Mode)})
+		}
+		tui.Header("Package plan")
+		tui.Table([]string{"source", "destination", "type", "mode"}, rows)
 	case "metadata":
-		info, err := deploycheck.Inspect(".")
+		info, err := deploycheck.Inspect(dir)
 		if err != nil {
 			tui.Err(err.Error())
 			os.Exit(1)
@@ -835,6 +966,9 @@ func cmdDeploy(args []string) {
 		}
 		data = append(data, '\n')
 		if output != "" {
+			if !filepath.IsAbs(output) {
+				output = filepath.Join(dir, output)
+			}
 			if err := os.WriteFile(output, data, 0644); err != nil {
 				tui.Err(err.Error())
 				os.Exit(1)
@@ -844,14 +978,26 @@ func cmdDeploy(args []string) {
 		}
 		fmt.Print(string(data))
 	case "check":
-		checks, err := deploycheck.CheckProject(".")
+		strict := false
+		for _, arg := range args[1:] {
+			if arg == "--strict" {
+				strict = true
+				continue
+			}
+			if arg != "--json" {
+				tui.Err("usage: kt deploy check [--strict] [--json]")
+				os.Exit(2)
+			}
+		}
+		checks, err := deploycheck.CheckProject(dir)
 		if err != nil {
 			tui.Err(err.Error())
 			os.Exit(1)
 		}
+		ok := !deploycheck.HasErrors(checks) && (!strict || !deploycheck.HasWarnings(checks))
 		if jsonOut {
-			writeJSON(map[string]any{"ok": !deploycheck.HasErrors(checks), "checks": checks})
-			if deploycheck.HasErrors(checks) {
+			writeJSON(map[string]any{"ok": ok, "checks": checks})
+			if !ok {
 				os.Exit(1)
 			}
 			return
@@ -874,13 +1020,88 @@ func cmdDeploy(args []string) {
 				tui.Err(msg)
 			}
 		}
-		if deploycheck.HasErrors(checks) {
+		if !ok {
 			os.Exit(1)
 		}
+	case "sync":
+		dryRun := false
+		for _, arg := range args[1:] {
+			if arg == "--dry-run" {
+				dryRun = true
+				continue
+			}
+			tui.Err("usage: kt deploy sync [--dry-run]")
+			os.Exit(2)
+		}
+		plan, err := deploycheck.PlanProject(dir)
+		if err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
+		manifest := filepath.Join(dir, "nfpm.yaml")
+		if dryRun {
+			updated, changed, err := deploycheck.PreviewPackageContents(manifest, plan)
+			if err != nil {
+				tui.Err(err.Error())
+				os.Exit(1)
+			}
+			if !changed {
+				tui.OK("kt-managed package contents are current")
+				return
+			}
+			if err := printUpdatedFileDiff(manifest, updated); err != nil {
+				tui.Err(err.Error())
+				os.Exit(1)
+			}
+			return
+		}
+		changed, err := deploycheck.SyncPackageContents(manifest, plan)
+		if err != nil {
+			tui.Err(err.Error())
+			os.Exit(1)
+		}
+		if changed {
+			tui.OK("updated kt-managed package contents")
+		} else {
+			tui.OK("kt-managed package contents are current")
+		}
 	default:
-		tui.Err("usage: kt deploy inspect [--json] | metadata [--json] [--output FILE] | check [--json]")
+		tui.Err("usage: kt deploy [--dir DIR] inspect|plan [--json] | metadata [--json] [--output FILE] | check [--strict] [--json] | sync [--dry-run]")
 		os.Exit(2)
 	}
+}
+
+func modeText(mode int) string {
+	if mode == 0 {
+		return ""
+	}
+	return fmt.Sprintf("0%o", mode)
+}
+
+func printUpdatedFileDiff(file, updated string) error {
+	tmp, err := os.CreateTemp("", "kt-nfpm-preview-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.WriteString(updated); err != nil {
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	cmd := exec.Command("diff", "-u", "--label", file, "--label", file, file, tmp.Name())
+	out, err := cmd.CombinedOutput()
+	if len(out) > 0 {
+		fmt.Print(string(out))
+	}
+	if err == nil {
+		return nil
+	}
+	if exit, ok := err.(*exec.ExitError); ok && exit.ExitCode() == 1 {
+		return nil
+	}
+	return err
 }
 
 func serviceNames(services []ktconfig.Service) []string {
@@ -892,6 +1113,17 @@ func serviceNames(services []ktconfig.Service) []string {
 }
 
 func cmdRelease(args []string) {
+	dir, args, err := extractDirOption(args)
+	if err != nil {
+		tui.Err(err.Error())
+		os.Exit(2)
+	}
+	restore, err := enterDir(dir)
+	if err != nil {
+		tui.Err(err.Error())
+		os.Exit(1)
+	}
+	defer restore()
 	if len(args) < 1 {
 		releaseUsage()
 		os.Exit(2)
@@ -956,7 +1188,7 @@ func cmdRelease(args []string) {
 				os.Exit(1)
 			}
 		}
-		tui.OK("valid release tag v" + v.String())
+		tui.OK("valid release tag " + releaseTag(v))
 	case "notes":
 		notes, err := releaseNotes(args[1:])
 		if err != nil {
@@ -974,7 +1206,7 @@ func cmdRelease(args []string) {
 			tui.Err(err.Error())
 			os.Exit(1)
 		}
-		tag := "v" + v.String()
+		tag := releaseTag(v)
 		if err := createReleaseTag(tag); err != nil {
 			tui.Err(err.Error())
 			os.Exit(1)
@@ -1015,7 +1247,7 @@ type releasePlan struct {
 }
 
 func releaseUsage() {
-	tui.Err("usage: kt release next <patch|minor|major|pre|stable> [--pre rc] | plan <patch|minor|major|version> [--pre rc] [--json] | notes [range|--since latest] | validate <vversion> [--github-output] | tag|push <version>")
+	tui.Err("usage: kt release [--dir DIR] next <patch|minor|major|pre|stable> [--pre rc] | plan <patch|minor|major|version> [--pre rc] [--json] | notes [range|--since latest] | validate <tag_prefix><version> [--github-output] | tag|push <version>")
 }
 
 func parseReleaseOptions(args []string) releaseOptions {
@@ -1081,7 +1313,7 @@ func buildReleasePlan(input, preLabel string) (releasePlan, error) {
 	if err != nil {
 		return releasePlan{}, err
 	}
-	next, err := versioning.Parse(input)
+	next, err := versioning.Parse(strings.TrimPrefix(input, releaseTagPrefix()))
 	if err != nil {
 		next, err = nextRelease(input, preLabel)
 		if err != nil {
@@ -1091,7 +1323,7 @@ func buildReleasePlan(input, preLabel string) (releasePlan, error) {
 		next.Pre = preLabel
 		next.PreN = 1
 	}
-	tag := "v" + next.String()
+	tag := releaseTag(next)
 	dirty, _ := gitOutput("status", "--porcelain")
 	plan := releasePlan{
 		Current:    current.String(),
@@ -1132,11 +1364,24 @@ func printReleasePlan(plan releasePlan) {
 	tui.Info("next: kt release push " + plan.Next)
 }
 
-func parseReleaseTag(tag string) (versioning.Version, error) {
-	if !strings.HasPrefix(tag, "v") {
-		return versioning.Version{}, fmt.Errorf("release tag must be v<semver>")
+func releaseTagPrefix() string {
+	project, err := ktconfig.Load()
+	if err == nil && strings.TrimSpace(project.Release.TagPrefix) != "" {
+		return project.Release.TagPrefix
 	}
-	return versioning.Parse(strings.TrimPrefix(tag, "v"))
+	return "v"
+}
+
+func releaseTag(version versioning.Version) string {
+	return releaseTagPrefix() + version.String()
+}
+
+func parseReleaseTag(tag string) (versioning.Version, error) {
+	prefix := releaseTagPrefix()
+	if !strings.HasPrefix(tag, prefix) {
+		return versioning.Version{}, fmt.Errorf("release tag must be %s<semver>", prefix)
+	}
+	return versioning.Parse(strings.TrimPrefix(tag, prefix))
 }
 
 func appendGitHubOutput(version string, prerelease bool) error {
@@ -1157,17 +1402,13 @@ func appendGitHubOutput(version string, prerelease bool) error {
 func releaseNotes(args []string) (string, error) {
 	rangeSpec := ""
 	if len(args) >= 2 && args[0] == "--since" && args[1] == "latest" {
-		last, err := gitOutput("describe", "--tags", "--abbrev=0", "HEAD^")
-		if err == nil && strings.TrimSpace(last) != "" {
-			rangeSpec = strings.TrimSpace(last) + "..HEAD"
+		if last, err := latestReleaseTag(); err == nil {
+			rangeSpec = last + "..HEAD"
 		}
 	} else if len(args) >= 1 {
 		rangeSpec = args[0]
-	} else {
-		last, err := gitOutput("describe", "--tags", "--abbrev=0", "HEAD^")
-		if err == nil && strings.TrimSpace(last) != "" {
-			rangeSpec = strings.TrimSpace(last) + "..HEAD"
-		}
+	} else if last, err := latestReleaseTag(); err == nil {
+		rangeSpec = last + "..HEAD"
 	}
 	gitArgs := []string{"log", "--oneline"}
 	if rangeSpec != "" {
@@ -1189,18 +1430,26 @@ func releaseNotes(args []string) (string, error) {
 	return b.String(), nil
 }
 
+func latestReleaseTag() (string, error) {
+	prefix := releaseTagPrefix()
+	out, err := gitOutput("for-each-ref", "--merged=HEAD", "--sort=-version:refname", "--format=%(refname:strip=2)", "refs/tags/"+prefix+"*")
+	if err != nil {
+		return "", err
+	}
+	for _, tag := range strings.Fields(out) {
+		if _, err := parseReleaseTag(tag); err == nil {
+			return tag, nil
+		}
+	}
+	return "", fmt.Errorf("no %s<semver> release tag is reachable from HEAD", prefix)
+}
+
 func latestReleaseVersion() (versioning.Version, error) {
-	out, err := gitOutput("for-each-ref", "--merged=HEAD", "--sort=-version:refname", "--format=%(refname:strip=2)", "refs/tags/v*")
+	tag, err := latestReleaseTag()
 	if err != nil {
 		return versioning.Version{}, err
 	}
-	for _, tag := range strings.Fields(out) {
-		v, err := versioning.Parse(tag)
-		if err == nil {
-			return v, nil
-		}
-	}
-	return versioning.Version{}, fmt.Errorf("no semver release tag is reachable from HEAD")
+	return parseReleaseTag(tag)
 }
 
 func createReleaseTag(tag string) error {
@@ -1247,7 +1496,30 @@ func gitRunQuiet(args ...string) error {
 	return cmd.Run()
 }
 
-func cmdDoctor() { runMake("doctor") }
+func cmdDoctor(args []string) {
+	dir, args, err := extractDirOption(args)
+	if err != nil {
+		tui.Err(err.Error())
+		os.Exit(2)
+	}
+	if len(args) > 0 {
+		tui.Err("usage: kt doctor [--dir DIR] [--json]")
+		os.Exit(2)
+	}
+	if !globalJSON {
+		runMakeAt(dir, "doctor")
+		return
+	}
+	result, err := doctor.Check(dir)
+	if err != nil {
+		tui.Err(err.Error())
+		os.Exit(1)
+	}
+	writeJSON(result)
+	if !result.OK {
+		os.Exit(1)
+	}
+}
 
 func cmdUpdate(args []string) {
 
@@ -1390,11 +1662,16 @@ func cmdVersion() {
 }
 
 func runMake(target string) {
-	if _, err := os.Stat("Makefile"); err != nil {
-		tui.Err("Makefile not found in " + mustGetwd())
+	runMakeAt(".", target)
+}
+
+func runMakeAt(dir, target string) {
+	if _, err := os.Stat(filepath.Join(dir, "Makefile")); err != nil {
+		tui.Err("Makefile not found in " + dir)
 		os.Exit(1)
 	}
 	cmd := exec.Command("make", target)
+	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
@@ -1402,8 +1679,6 @@ func runMake(target string) {
 		os.Exit(1)
 	}
 }
-
-func mustGetwd() string { wd, _ := os.Getwd(); return wd }
 
 func initNextHint(dir string) string {
 	projectFile := filepath.Join(dir, ".kt", "project.yaml")

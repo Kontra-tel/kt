@@ -71,6 +71,18 @@ It is **not** a deployment framework — it sets up the structure, then normal L
 kt templates   # list all available templates
 ```
 
+## 1.5 changes
+
+`1.5.0` makes `.kt/project.yaml` enforceable at the package boundary:
+
+- `kt deploy plan` derives the expected nFPM source-to-destination mappings from the manifest
+- `kt deploy check` verifies every declared command and the matching `nfpm.yaml` entries; `--strict` promotes warnings to failures
+- `kt deploy sync --dry-run` previews, and `kt deploy sync` refreshes, only the marker-owned package entries in new scaffolds
+- `config`, `deploy`, `release`, and `doctor` accept `--dir`; `doctor --json` reports resolved tools and versions
+- release commands honor `release.tag_prefix`; new scaffolds include `make verify`
+
+Read [1.5 migration](docs/migration-1.5.md) before syncing an existing project's package manifest.
+
 ## 1.4 changes
 
 `1.4.0` expands the project tooling contract without changing the generated runtime model:
@@ -118,4 +130,5 @@ MIT. See [LICENSE](LICENSE).
 - [1.4 migration](docs/migration-1.4.md)
 - [1.3 migration](docs/migration-1.3.md)
 - [Filesystem layout migration](docs/migration-fhs.md)
+- [1.5 migration](docs/migration-1.5.md)
 - [Release & maintenance](docs/release.md)

@@ -10,6 +10,9 @@ maintainer: {{.Author}}
 description: ${APP} CLI with companion service
 
 contents:
+  # kt owns only the entries between these markers.
+  # Add custom package entries after the closing marker.
+  # kt:contents:start
   - src: dist/app
     dst: /usr/lib/{{.App}}
 
@@ -34,6 +37,8 @@ contents:
 
   - src: deploy/systemd/{{.App}}-service.service
     dst: /usr/lib/systemd/system/{{.App}}-service.service
+
+  # kt:contents:end
 
 scripts:
   postinstall: deploy/scripts/postinstall.sh

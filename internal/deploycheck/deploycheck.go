@@ -88,17 +88,32 @@ func CheckProject(dir string) ([]Check, error) {
 		add("warn", "config examples", filepath.Join(dir, configDir), "no *"+project.Config.ExampleSuffix+" files found")
 	}
 
+	for _, command := range project.CommandDetails() {
+		if !validProjectPath(command.Path, "deploy/bin") {
+			add("error", "command", filepath.Join(dir, command.Path), "path must be under deploy/bin")
+			continue
+		}
+		checkExecutable(&checks, dir, "command", filepath.Join(dir, command.Path))
+	}
+	plan := Plan(project)
+	checkPackagePlan(&checks, dir, plan)
+
 	if project.Kind == "cli" {
-		cmd := filepath.Join(dir, "deploy", "bin", project.App)
-		checkExecutable(&checks, dir, "command", cmd)
 		return checks, nil
 	}
 
 	for _, svc := range project.ServiceDetails() {
 		service := fillServiceDefaults(project, svc)
-		runner := filepath.Join(dir, service.Runner)
+		if !validProjectPath(service.Runner, "deploy/run") {
+			add("error", "service runner", filepath.Join(dir, service.Runner), "path must be under deploy/run")
+		} else {
+			checkExecutable(&checks, dir, "service runner", filepath.Join(dir, service.Runner))
+		}
+		if !validProjectPath(service.Unit, "deploy/systemd") {
+			add("error", "service unit", filepath.Join(dir, service.Unit), "path must be under deploy/systemd")
+			continue
+		}
 		unit := filepath.Join(dir, service.Unit)
-		checkExecutable(&checks, dir, "service runner", runner)
 		checkFile(&checks, dir, "service unit", unit)
 		checkUnit(&checks, dir, project.App, service.Name, unit)
 	}
@@ -116,6 +131,15 @@ func CheckProject(dir string) ([]Check, error) {
 func HasErrors(checks []Check) bool {
 	for _, check := range checks {
 		if check.Level == "error" {
+			return true
+		}
+	}
+	return false
+}
+
+func HasWarnings(checks []Check) bool {
+	for _, check := range checks {
+		if check.Level == "warn" {
 			return true
 		}
 	}

@@ -15,7 +15,7 @@ include .kt/mk/nfpm.mk
 
 # ── Project targets ────────────────────────────────────────────────────────────
 
-.PHONY: test build run print-info install
+.PHONY: test build run print-info install verify
 
 test: ## Run tests
 	@echo "TODO: add your test command"
@@ -34,5 +34,8 @@ print-info: ## Show packaged service metadata
 	@sh deploy/bin/$(APP)
 
 install: local-install ## Install package on this machine
+
+verify: config-check ## Validate the manifest, deploy files, and package mappings
+	@kt deploy check --strict
 
 # For command-line applications with no service unit, use `kt init cli <app>`.

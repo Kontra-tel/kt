@@ -1,16 +1,6 @@
 # nFPM package manifest — https://nfpm.goreleaser.com/configuration/
-#
-# Build packages with:
-#   make package          — build for the native package manager and arch
-#   make package-deb      — .deb only
-#   make package-rpm      — .rpm only
-#
-# APP, ARCH, and VERSION are injected by nfpm.mk at build time:
-#   APP     — from .kt/project.yaml via `kt config get app`
-#   ARCH    — host architecture (amd64, arm64, …)
-#   VERSION — version derived from the release tag or supplied by CI
+# APP, ARCH, and VERSION are injected by nfpm.mk at build time.
 
-# ── Package identity ───────────────────────────────────────────────────────────
 name: ${APP}
 arch: ${ARCH}
 platform: linux
@@ -20,47 +10,39 @@ priority: optional
 maintainer: {{.Author}}
 description: ${APP} — backend and frontend
 
-# ── Package contents ───────────────────────────────────────────────────────────
 contents:
-  # Application files — `make build` should populate both dist/app/backend/
-  # and dist/app/frontend/ before `make package` is called.
+  # kt owns only the entries between these markers.
+  # Add custom package entries after the closing marker.
+  # kt:contents:start
   - src: dist/app
     dst: /usr/lib/{{.App}}
 
-  # Additional runtime files (optional) — uncomment to package static assets,
-  # SQL migrations, config schemas, or other files your app reads from disk.
-  # These are taken directly from the repository, bypassing the build step.
-  # - src: resources
-  #   dst: /usr/lib/{{.App}}/resources
-
-  # User-facing metadata command.
   - src: deploy/bin/{{.App}}
     dst: /usr/bin/{{.App}}
     file_info:
       mode: 0755
 
-  # Backend service runner — used by the service manager.
   - src: deploy/run/{{.App}}-backend
     dst: /usr/lib/{{.App}}/bin/{{.App}}-backend
     file_info:
       mode: 0755
 
-  # Frontend service runner — used by the service manager.
   - src: deploy/run/{{.App}}-frontend
     dst: /usr/lib/{{.App}}/bin/{{.App}}-frontend
     file_info:
       mode: 0755
 
-  # Runtime config examples (all formats — .env, .yaml, .ini, etc.)
   - src: deploy/config/*.example
     dst: /etc/{{.App}}/
     type: config|noreplace
 
-  # systemd service units
   - src: deploy/systemd/{{.App}}-backend.service
     dst: /usr/lib/systemd/system/{{.App}}-backend.service
+
   - src: deploy/systemd/{{.App}}-frontend.service
     dst: /usr/lib/systemd/system/{{.App}}-frontend.service
+
+  # kt:contents:end
 
 scripts:
   postinstall: deploy/scripts/postinstall.sh
