@@ -174,7 +174,7 @@ kt release tag 1.5.0               # create local annotated tag using the config
 kt release push 1.5.0              # create and push the configured tag
 ```
 
-`tag` and `push` require a clean working tree, reject invalid SemVer versions, and refuse tags that already exist locally or on `origin`.
+`tag` and `push` require a clean working tree, reject invalid SemVer versions, and refuse tags that already exist locally or on `origin`. `push` also requires a checked-out branch and fast-forward-pushes that branch before it creates the release tag.
 
 ## kt update
 
@@ -185,8 +185,6 @@ kt update          # check and apply
 kt update --check  # check only; also informs about newer prereleases
 kt update --prerelease
 ```
-
-Automatically re-runs with `sudo` if the install location requires elevated permissions. Has no effect on dev builds.
 
 By default, `kt update` only installs stable releases. `kt update --check` still informs you when a newer prerelease exists. Use `--prerelease` to opt into downloading prerelease versions such as `1.3.0-rc.1`. `--check` and `--prerelease` are intentionally separate modes.
 

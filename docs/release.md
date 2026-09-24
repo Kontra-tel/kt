@@ -7,12 +7,14 @@ Releases are driven by immutable annotated Git tags. Push a strict SemVer tag in
 ```bash
 kt release plan minor
 kt release next minor --pre rc
-kt release push 1.4.0-rc.1
+kt release push 1.5.0-rc.1
 kt release next stable
-kt release push 1.4.0
+kt release push 1.5.0
 ```
 
-The `plan` command previews the current reachable release, next version, tag, dirty state, and local/remote tag conflicts. The `push` command requires a clean working tree and refuses a version that is already tagged locally or on `origin`. It never changes source files.
+The `plan` command previews the current reachable release, next version, tag, dirty state, and local/remote tag conflicts. `kt release push` requires a clean working tree and a checked-out branch. It first fast-forward-pushes that branch to `origin`, then creates and pushes the immutable tag. A branch push failure therefore cannot leave a new release tag pointing at unpushed source.
+
+The workflow checks out the tag, validates it against its checked-out commit, tests the source, builds every binary and Linux package, verifies non-empty artifacts, writes and verifies `SHA256SUMS`, then publishes the release. nFPM is pinned to `v2.47.0` for reproducible package builds.
 
 ### Tag prefixes
 

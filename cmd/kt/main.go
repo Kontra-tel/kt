@@ -1207,6 +1207,16 @@ func cmdRelease(args []string) {
 			os.Exit(1)
 		}
 		tag := releaseTag(v)
+		if args[0] == "push" {
+			if err := ensureReleaseReady(); err != nil {
+				tui.Err(err.Error())
+				os.Exit(1)
+			}
+			if err := pushReleaseBranch(); err != nil {
+				tui.Err(err.Error())
+				os.Exit(1)
+			}
+		}
 		if err := createReleaseTag(tag); err != nil {
 			tui.Err(err.Error())
 			os.Exit(1)
@@ -1402,12 +1412,12 @@ func appendGitHubOutput(version string, prerelease bool) error {
 func releaseNotes(args []string) (string, error) {
 	rangeSpec := ""
 	if len(args) >= 2 && args[0] == "--since" && args[1] == "latest" {
-		if last, err := latestReleaseTag(); err == nil {
+		if last, err := latestReleaseTagAt("HEAD^"); err == nil {
 			rangeSpec = last + "..HEAD"
 		}
 	} else if len(args) >= 1 {
 		rangeSpec = args[0]
-	} else if last, err := latestReleaseTag(); err == nil {
+	} else if last, err := latestReleaseTagAt("HEAD^"); err == nil {
 		rangeSpec = last + "..HEAD"
 	}
 	gitArgs := []string{"log", "--oneline"}
@@ -1431,8 +1441,12 @@ func releaseNotes(args []string) (string, error) {
 }
 
 func latestReleaseTag() (string, error) {
+	return latestReleaseTagAt("HEAD")
+}
+
+func latestReleaseTagAt(ref string) (string, error) {
 	prefix := releaseTagPrefix()
-	out, err := gitOutput("for-each-ref", "--merged=HEAD", "--sort=-version:refname", "--format=%(refname:strip=2)", "refs/tags/"+prefix+"*")
+	out, err := gitOutput("for-each-ref", "--merged="+ref, "--sort=-version:refname", "--format=%(refname:strip=2)", "refs/tags/"+prefix+"*")
 	if err != nil {
 		return "", err
 	}
@@ -1441,7 +1455,7 @@ func latestReleaseTag() (string, error) {
 			return tag, nil
 		}
 	}
-	return "", fmt.Errorf("no %s<semver> release tag is reachable from HEAD", prefix)
+	return "", fmt.Errorf("no %s<semver> release tag is reachable from %s", prefix, ref)
 }
 
 func latestReleaseVersion() (versioning.Version, error) {
@@ -1453,15 +1467,8 @@ func latestReleaseVersion() (versioning.Version, error) {
 }
 
 func createReleaseTag(tag string) error {
-	dirty, err := gitOutput("status", "--porcelain")
-	if err != nil {
+	if err := ensureReleaseReady(); err != nil {
 		return err
-	}
-	if dirty != "" {
-		return fmt.Errorf("working tree must be clean before creating a release tag")
-	}
-	if err := gitRun("rev-parse", "--verify", "HEAD"); err != nil {
-		return fmt.Errorf("HEAD is not a commit: %w", err)
 	}
 	if err := gitRun("show-ref", "--verify", "--quiet", "refs/tags/"+tag); err == nil {
 		return fmt.Errorf("tag %s already exists locally", tag)
@@ -1474,6 +1481,35 @@ func createReleaseTag(tag string) error {
 		return fmt.Errorf("tag %s already exists on origin", tag)
 	}
 	return gitRun("tag", "-a", tag, "-m", "Release "+tag)
+}
+
+func ensureReleaseReady() error {
+	dirty, err := gitOutput("status", "--porcelain")
+	if err != nil {
+		return err
+	}
+	if dirty != "" {
+		return fmt.Errorf("working tree must be clean before creating a release tag")
+	}
+	if err := gitRun("rev-parse", "--verify", "HEAD"); err != nil {
+		return fmt.Errorf("HEAD is not a commit: %w", err)
+	}
+	return nil
+}
+
+func pushReleaseBranch() error {
+	branch, err := gitOutput("branch", "--show-current")
+	if err != nil {
+		return err
+	}
+	branch = strings.TrimSpace(branch)
+	if branch == "" {
+		return fmt.Errorf("release push requires a checked-out branch")
+	}
+	if err := gitRun("push", "origin", "HEAD:refs/heads/"+branch); err != nil {
+		return fmt.Errorf("push release branch %s: %w", branch, err)
+	}
+	return nil
 }
 
 func gitOutput(args ...string) (string, error) {
